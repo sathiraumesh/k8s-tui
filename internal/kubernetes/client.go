@@ -34,6 +34,12 @@ type Client struct {
 	rawGet func(ctx context.Context, path string) ([]byte, error)
 }
 
+// NewClientFromClientset wraps an existing clientset, such as the fake one
+// from k8s.io/client-go/kubernetes/fake, so tests can use a pretend cluster.
+func NewClientFromClientset(cs kubernetes.Interface) *Client {
+	return &Client{clientset: cs}
+}
+
 // NewClient connects using your kubeconfig (~/.kube/config, or $KUBECONFIG),
 // the same way kubectl does, with its current context.
 func NewClient() (*Client, error) {
