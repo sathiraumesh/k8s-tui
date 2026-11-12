@@ -22,6 +22,8 @@ internal/
     refresh.go              the auto refresh timer and rates (logic only)
     secondary_bar_view.go   the buttons on the panel's top border: wide,
                             refresh (drawing only)
+    scroll.go               scrolling the list: listHeight, keepCursorVisible
+    scroll_view.go          "4-9 of 30" on the panel's bottom border
   styles/                   the colour palette
 examples/                   small stand-alone programs for learning Bubble Tea
                             and Lip Gloss; not part of the app
@@ -117,6 +119,21 @@ columns. So `itemsLoadedMsg` carries the `wide` it was loaded with, and
 `Update` drops rows whose `wide` no longer matches the tab's setting; the
 load the switch started brings the right ones.
 
+### Scrolling
+
+The panel shows `listHeight()` rows, starting at `m.offset`
+([scroll.go](../internal/mvc/scroll.go)). Whenever the cursor moves, the
+window is resized or a tab's rows change, `Update` calls
+`keepCursorVisible`, which moves the offset as little as possible so the
+cursor's row is on screen and the list is never scrolled past its end.
+`View` asks `visibleRange` which rows to draw, and
+[scroll_view.go](../internal/mvc/scroll_view.go) writes "4-9 of 30" into
+the bottom border while the list is longer than the panel.
+
+Rows are cut to the panel's inner width with `MaxWidth` before they are
+drawn: a wrapped row would take two lines and make the panel taller than
+the screen.
+
 ### Drawing the screen
 
 `View` builds the screen from top to bottom and joins the parts with
@@ -135,8 +152,8 @@ terminal scrolls and the tab bar disappears off the top. So the panel's
 height is worked out from what is left:
 
 ```go
-bodyH := m.height - 2 - 2*panelMarginY // tab bar + help line + margins
-panelH := bodyH - 2                    // minus the top and bottom border
+// listHeight, in scroll.go: the rows inside the panel
+m.height - 2 - 2*panelMarginY - 2 // tab bar + help line, margins, top + bottom border
 ```
 
 Every number is in terminal cells (characters across, rows down). Lip
@@ -236,8 +253,3 @@ go test ./...
 
 Without a terminal, Lip Gloss leaves out colours, so view tests check the
 text and the layout (which line is where, and how wide), not colours.
-
-**Known failure:** `TestViewManyRowsDoNotGrowScreen`. The panel's
-`Height` is a minimum, so a list with more rows than fit makes the panel
-taller than the screen. The fix is to scroll the list: keep a scroll
-offset in the model and draw only the rows that fit.

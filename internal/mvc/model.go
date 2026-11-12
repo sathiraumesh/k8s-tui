@@ -38,6 +38,11 @@ type Model struct {
 	// Changed by ↑ / ↓, and reset to 0 when switching tabs.
 	cursor int
 
+	// offset is the index of the first row shown in the panel: how far the
+	// list is scrolled down. Update keeps the cursor's row on screen (see
+	// scroll.go). Reset to 0 when switching tabs.
+	offset int
+
 	// width and height are the terminal size in cells (columns and rows).
 	// Bubble Tea sends them in a tea.WindowSizeMsg at start and on every resize.
 	// They are 0 until that first message arrives, so View shows "loading...".

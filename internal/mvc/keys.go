@@ -37,4 +37,8 @@ const (
 	// Move cursor up the list
 	KeyUp = "up" // ↑ arrow
 	KeyK  = "k"  // vim-style up
+
+	// Move a page (the rows that fit in the panel) down / up the list
+	KeyPageDown = "pgdown"
+	KeyPageUp   = "pgup"
 )

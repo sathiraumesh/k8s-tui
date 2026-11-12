@@ -6,6 +6,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m = m.keepCursorVisible() // a shorter window shows fewer rows
 
 	// Time to refresh: reload the active tab and schedule the next tick.
 	// Drop ticks from an old timer, and stop when auto refresh is off.
@@ -32,8 +33,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// A refresh can return fewer rows (a node was removed):
 		// keep the cursor on a row that still exists.
-		if msg.tab == m.tabs[m.active] && m.cursor >= len(msg.rows) {
-			m.cursor = max(len(msg.rows)-1, 0)
+		if msg.tab == m.tabs[m.active] {
+			if m.cursor >= len(msg.rows) {
+				m.cursor = max(len(msg.rows)-1, 0)
+			}
+			m = m.keepCursorVisible()
 		}
 
 	case tea.KeyMsg:
@@ -49,8 +53,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 //	buttons  ← → move button    ↑ tabs   ↓ list   enter/space press
 //	list     ↑ ↓ move row       ↑ on the top row: buttons (or tabs)
 func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	rows := m.items[m.tabs[m.active]]
-
 	switch msg.String() {
 	case KeyQuit, KeyCtrlC:
 		return m, tea.Quit
@@ -108,9 +110,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case focusButtons:
 			m.focus = focusList
 		default:
-			if m.cursor < len(rows)-1 {
-				m.cursor++
-			}
+			m = m.moveCursor(+1) // scrolls when it reaches the bottom
 		}
 
 	// ↑ : up the list; from its top row to the buttons, then to the tabs.
@@ -118,22 +118,33 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch m.focus {
 		case focusList:
 			if m.cursor > 0 {
-				m.cursor--
+				m = m.moveCursor(-1) // scrolls when it reaches the top
 			} else {
 				m.focus = m.aboveList()
 			}
 		case focusButtons:
 			m.focus = focusTabs
 		}
+
+	// pgdown / pgup: a page (the rows that fit in the panel) down or up the list.
+	case KeyPageDown:
+		if m.focus == focusList {
+			m = m.moveCursor(+m.listHeight())
+		}
+	case KeyPageUp:
+		if m.focus == focusList {
+			m = m.moveCursor(-m.listHeight())
+		}
 	}
 	return m, nil
 }
 
 // switchTab moves to the tab step places along (wrapping), and loads it
-// right away instead of waiting for the next tick.
+// right away instead of waiting for the next tick. The new tab starts at
+// its first row, scrolled to the top.
 func (m Model) switchTab(step int) (tea.Model, tea.Cmd) {
 	m.active = (m.active + step + len(m.tabs)) % len(m.tabs)
-	m.cursor = 0
+	m.cursor, m.offset = 0, 0
 	return m, m.loadActive()
 }
 

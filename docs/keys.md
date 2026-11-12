@@ -58,7 +58,18 @@ Coming down from the tabs, the cursor lands on the first button, `wide`.
 |---|---|
 | `↓` / `j` | next row (stops at the last one) |
 | `↑` / `k` | previous row; on the first row, go to the buttons |
+| `pgdown` / `pgup` | a page (the rows that fit in the panel) down or up |
 | `←` / `→` | switch tab |
+
+When the list is longer than the panel, it scrolls to keep the cursor's
+row on screen, and the bottom border shows which rows you see:
+
+```
+└─ 4-12 of 30 ──────────────────────────────────────────────┘
+```
+
+Rows wider than the panel are cut off at its edge. Switching tabs scrolls
+back to the top.
 
 ## Anywhere
 

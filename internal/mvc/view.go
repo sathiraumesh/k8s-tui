@@ -67,29 +67,38 @@ func (m Model) View() string {
 	// Panel size: full width, full height minus the lines around it.
 	// Width/Height include padding but not the border or margin, so subtract those.
 	// If the total is taller than the terminal, the top lines (the tab bar) scroll off.
-	bodyH := m.height - 2 - 2*panelMarginY // tab bar + help line + margin above and below the panel
-	panelW := m.width - 2                  // left + right border
-	panelH := bodyH - 2                    // top + bottom border
+	panelW := m.width - 2    // left + right border
+	panelH := m.listHeight() // rows inside the panel (see scroll.go)
+	innerW := panelW - 2     // minus Panel's Padding(0, 1) on each side
 
-	// Single panel: list. Underline the selected row only when the cursor is on the list
+	// Single panel: the rows that fit, from the scroll offset on.
+	// Underline the selected row only when the cursor is on the list.
 	rows := m.items[m.tabs[m.active]]
 	if m.err != nil {
 		rows = []string{"error: " + m.err.Error()}
 	}
-	var list strings.Builder
-	for i, r := range rows {
+	first, end := visibleRange(m.offset, len(rows), panelH)
+
+	// A row longer than the panel is cut off at its edge: a wrapped row would
+	// take two lines and push the panel taller than the screen.
+	cut := lipgloss.NewStyle().MaxWidth(innerW)
+
+	lines := make([]string, 0, end-first)
+	for i := first; i < end; i++ {
+		line := cut.Render(rows[i])
 		if i == m.cursor {
-			style := Selected.Width(panelW - 2)
+			style := Selected.Width(innerW)
 			if m.focus == focusList {
 				style = style.Underline(true)
 			}
-			list.WriteString(style.Render(r))
-		} else {
-			list.WriteString(r)
+			line = style.Render(line)
 		}
-		list.WriteString("\n")
+		lines = append(lines, line)
 	}
-	body := Panel.Width(panelW).Height(panelH).Render(list.String())
+	body := Panel.Width(panelW).Height(panelH).Render(strings.Join(lines, "\n"))
+
+	// "4-9 of 30" on the bottom border while the list is longer than the panel.
+	body = withScrollInfo(body, scrollInfo(first, end, len(rows), panelH), lipgloss.Width(body))
 
 	// Set the buttons into the panel's top border, right under the tabs.
 	// The one the cursor is on (if any) is underlined.

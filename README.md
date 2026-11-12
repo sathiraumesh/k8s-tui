@@ -20,6 +20,8 @@ tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r
 - **Nodes** are loaded live from the cluster: name, status and kubelet version.
 - **Wide** adds the columns of `kubectl get nodes -o wide`: internal and
   external IP, OS image, kernel version and container runtime.
+- **Long lists scroll**: the panel shows the rows that fit, and the bottom
+  border says which ones, for example `4-12 of 30`.
 - **Auto refresh** reloads the tab you're on every 2, 5 or 10 seconds, or
   not at all. The time of the last update shows in the top-right corner.
 - **Pods, Deployments and Services** show placeholder rows for now; they
@@ -50,6 +52,7 @@ cluster can't be reached, the panel shows the error instead of the rows.
 |---|---|
 | `←` `→` (or `h` `l`) | switch tab; on the buttons, move between them |
 | `↑` `↓` (or `k` `j`) | move between the tabs, the buttons and the list, and through the list |
+| `pgup` / `pgdown` | a page up or down the list |
 | `tab` | step the focus: tabs → buttons → list |
 | `shift+tab` | previous tab |
 | `enter` / `space` | press the button the cursor is on |
@@ -66,9 +69,6 @@ go test ./...
 ```
 
 The tests use client-go's fake cluster, so they need no real cluster.
-One test, `TestViewManyRowsDoNotGrowScreen`, fails on purpose for now: the
-list doesn't scroll yet, so a list longer than the screen pushes the tabs
-off the top.
 
 ## More
 
