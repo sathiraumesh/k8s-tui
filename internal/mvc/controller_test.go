@@ -97,6 +97,13 @@ func TestCursorStopsAtLastRow(t *testing.T) {
 }
 
 func TestSwitchTabs(t *testing.T) {
+	// One → per tab goes all the way round, back to the first.
+	last := len(testModel().tabs) - 1
+	allTheWayRound := make([]tea.Msg, last+1)
+	for i := range allTheWayRound {
+		allTheWayRound[i] = right
+	}
+
 	tests := []struct {
 		name       string
 		keys       []tea.Msg
@@ -107,8 +114,8 @@ func TestSwitchTabs(t *testing.T) {
 		{"left goes to previous tab", []tea.Msg{right, left}, 0},
 		{"h goes to previous tab", []tea.Msg{right, h}, 0},
 		{"shift+tab goes to previous tab", []tea.Msg{right, shiftTab}, 0},
-		{"right on last tab wraps to first", []tea.Msg{right, right, right, right}, 0},
-		{"left on first tab wraps to last", []tea.Msg{left}, 3},
+		{"right on last tab wraps to first", allTheWayRound, 0},
+		{"left on first tab wraps to last", []tea.Msg{left}, last},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

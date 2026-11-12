@@ -81,17 +81,24 @@ type Model struct {
 	wide map[string]bool
 }
 
+// Names of the tabs that are loaded from the cluster.
+const (
+	tabNodes = "Nodes"
+	tabMore  = "More" // every resource type the cluster serves, like `kubectl api-resources`
+)
+
 // New returns a Model with its starting state.
 // client may be nil (in tests); then nothing is loaded from a cluster.
 func New(client *k8s.Client) Model {
 	return Model{
 		client: client,
-		tabs:   []string{"Nodes", "Pods", "Deployments", "Services"},
+		tabs:   []string{tabNodes, "Pods", "Deployments", "Services", tabMore},
 		items: map[string][]string{
-			"Nodes":       {"loading..."}, // replaced when the nodes arrive
+			tabNodes:      {"loading..."}, // replaced when the nodes arrive
 			"Pods":        {"nginx-7c5ddbdf54-abcde", "redis-0", "api-6f9d8b7c9-xyz12"},
 			"Deployments": {"nginx", "api"},
 			"Services":    {"kubernetes", "nginx-svc", "redis"},
+			tabMore:       {"loading..."}, // replaced when the resource types arrive
 		},
 		refreshEvery: defaultRefresh,
 		updated:      map[string]time.Time{},

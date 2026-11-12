@@ -45,9 +45,25 @@ func (m Model) stepRefresh() (Model, tea.Cmd) {
 	m.refreshEvery = nextRate(m.refreshEvery)
 	m.tickGen++ // any tick still on its way is from the old timer
 	if wasOff {
-		return m, tea.Batch(m.loadActive(), m.startTimer())
+		return m, tea.Batch(m.refreshActive(), m.startTimer())
 	}
 	return m, m.startTimer()
+}
+
+// autoRefreshed reports whether the active tab is reloaded by the timer.
+// The More tab is not: the resource types a cluster serves rarely change,
+// so it is loaded once (and again when its wide setting changes).
+func (m Model) autoRefreshed() bool {
+	return m.tabs[m.active] != tabMore
+}
+
+// refreshActive is loadActive for the timer: nil on a tab that is not
+// auto refreshed.
+func (m Model) refreshActive() tea.Cmd {
+	if !m.autoRefreshed() {
+		return nil
+	}
+	return m.loadActive()
 }
 
 // loadActive returns the command that loads the active tab from the cluster,
@@ -56,9 +72,12 @@ func (m Model) loadActive() tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
-	switch m.tabs[m.active] {
-	case "Nodes":
-		return loadNodes(m.client, m.wide["Nodes"])
+	tab := m.tabs[m.active]
+	switch tab {
+	case tabNodes:
+		return loadNodes(m.client, m.wide[tab])
+	case tabMore:
+		return loadResources(m.client, m.wide[tab])
 	}
 	return nil // Pods, Deployments, Services: placeholder data for now
 }

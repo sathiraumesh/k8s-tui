@@ -14,7 +14,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.gen != m.tickGen || m.refreshEvery == refreshOff {
 			return m, nil
 		}
-		return m, tea.Batch(m.loadActive(), m.startTimer())
+		// On a tab that isn't auto refreshed (More) the timer keeps running,
+		// so refreshing starts again on the next tab that is.
+		return m, tea.Batch(m.refreshActive(), m.startTimer())
 
 	// A tab's data arrived from the cluster (see nodes_commands.go).
 	case itemsLoadedMsg:
@@ -145,6 +147,15 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) switchTab(step int) (tea.Model, tea.Cmd) {
 	m.active = (m.active + step + len(m.tabs)) % len(m.tabs)
 	m.cursor, m.offset = 0, 0
+
+	// Tabs have different buttons (More has no refresh button): keep the
+	// button cursor on one that exists.
+	m.button = min(m.button, len(m.panelButtons())-1)
+
+	// A tab that isn't auto refreshed is loaded the first time it is opened.
+	if _, loaded := m.updated[m.tabs[m.active]]; !m.autoRefreshed() && loaded {
+		return m, nil
+	}
 	return m, m.loadActive()
 }
 

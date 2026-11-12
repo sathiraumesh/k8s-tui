@@ -76,6 +76,11 @@ func (m Model) panelButtons() []button {
 		wide.label, wide.on = "wide: on", true
 	}
 
+	// A tab that isn't auto refreshed (More) has no refresh button.
+	if !m.autoRefreshed() {
+		return []button{wide}
+	}
+
 	refresh := button{name: buttonRefresh, label: "refresh: off"}
 	if m.refreshEvery != refreshOff {
 		refresh.label, refresh.on = "refresh: "+m.refreshEvery.String(), true
@@ -113,12 +118,17 @@ func (m Model) buttonsShown() bool {
 // lastUpdated is the text for the right corner of the top border,
 // "updated 14:30:05": when the active tab last loaded. It is "" while
 // refresh is off, or before the tab has loaded once.
+//
+// On a tab that isn't auto refreshed (More) it is "loaded 14:30:05" instead,
+// shown whatever the refresh rate: the tab is loaded once, not kept updated.
 func (m Model) lastUpdated() string {
-	if m.refreshEvery == refreshOff {
-		return ""
-	}
 	at, ok := m.updated[m.tabs[m.active]]
-	if !ok {
+	switch {
+	case !ok:
+		return ""
+	case !m.autoRefreshed():
+		return "loaded " + at.Format("15:04:05")
+	case m.refreshEvery == refreshOff:
 		return ""
 	}
 	return "updated " + at.Format("15:04:05")
