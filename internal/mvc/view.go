@@ -1,0 +1,79 @@
+package mvc
+
+import (
+	"k8s-tui/internal/styles"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	// activeTab draws the currently selected tab as a filled "pill".
+	ActiveTab = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(styles.ColorCream). // text color
+			Background(styles.Accent).     // fill behind the text
+			Padding(0, 2)                  // 0 lines top/bottom, 2 spaces left/right
+
+	// inactiveTab draws the other tabs as plain gray text.
+	// Same padding as activeTab so tabs don't shift when switching.
+	InactiveTab = lipgloss.NewStyle().
+			Foreground(styles.Muted).
+			Padding(0, 2)
+
+	// Panel draws a square single-line box around content.
+	// Set the size per use, e.g. Panel.Width(30).Height(10).Render(text).
+	Panel = lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()). // ┌─┐ │ │ └─┘ corners
+		BorderForeground(styles.Accent). // colors only the border lines
+		Padding(0, 1)                    // 1 space between border and text
+
+	// selected highlights the row under the cursor in the list.
+	Selected = lipgloss.NewStyle().
+			Background(lipgloss.Color("#3A3A5C")). // soft purple-gray shade
+			Foreground(lipgloss.Color("#FFFFFF"))
+
+	// help draws the key-hint line at the bottom of the screen.
+	Help = lipgloss.NewStyle().Foreground(styles.Accent)
+)
+
+func (m Model) View() string {
+	if m.width == 0 {
+		return "loading..."
+	}
+
+	// Tab bar
+	var tabs []string
+	for i, t := range m.tabs {
+		if i == m.active {
+			tabs = append(tabs, ActiveTab.Render(t))
+		} else {
+			tabs = append(tabs, InactiveTab.Render(t))
+		}
+	}
+	tabBar := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+
+	// Panel size: full width, full height minus the tab bar, gap and help line.
+	// Width/Height include padding but not the border or margin, so subtract those.
+	// If the total is taller than the terminal, the top lines (the tab bar) scroll off.
+	bodyH := m.height - 3 // tab bar + gap (Panel's MarginTop) + help line
+	panelW := m.width - 2 // left + right border
+	panelH := bodyH - 2   // top + bottom border
+
+	// Single panel: list
+	rows := m.items[m.tabs[m.active]]
+	var list strings.Builder
+	for i, r := range rows {
+		if i == m.cursor {
+			list.WriteString(Selected.Width(panelW - 2).Render(r))
+		} else {
+			list.WriteString("  " + r)
+		}
+		list.WriteString("\n")
+	}
+	body := Panel.Width(panelW).Height(panelH).Render(list.String())
+
+	footer := Help.Render("tab/←→ switch tab • ↑↓ move • q quit")
+
+	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
+}
