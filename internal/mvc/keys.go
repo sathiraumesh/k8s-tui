@@ -8,8 +8,10 @@ const (
 	KeyQuit  = "q"
 	KeyCtrlC = "ctrl+c"
 
+	// Switch focus between the tab bar and the list
+	KeyTab = "tab"
+
 	// Next tab
-	KeyTab   = "tab"
 	KeyRight = "right" // → arrow
 	KeyL     = "l"     // vim-style right
 

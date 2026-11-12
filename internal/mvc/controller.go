@@ -12,21 +12,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case KeyQuit, KeyCtrlC:
 			return m, tea.Quit
-		case KeyTab, KeyRight, KeyL:
+
+		// tab: jump between the tab bar and the list
+		case KeyTab:
+			if m.focus == focusTabs {
+				m.focus = focusList
+			} else {
+				m.focus = focusTabs
+			}
+
+		// ← →: switch tabs (works from anywhere)
+		case KeyRight, KeyL:
 			m.active = (m.active + 1) % len(m.tabs)
 			m.cursor = 0
 		case KeyShiftTab, KeyLeft, KeyH:
 			m.active = (m.active - 1 + len(m.tabs)) % len(m.tabs)
 			m.cursor = 0
+
+		// ↓: from the tabs go into the list, in the list move down
 		case KeyDown, KeyJ:
-			if m.cursor < len(rows)-1 {
+			if m.focus == focusTabs {
+				m.focus = focusList
+			} else if m.cursor < len(rows)-1 {
 				m.cursor++
 			}
+
+		// ↑: in the list move up, at the top row go back to the tabs
 		case KeyUp, KeyK:
-			if m.cursor > 0 {
-				m.cursor--
+			if m.focus == focusList {
+				if m.cursor > 0 {
+					m.cursor--
+				} else {
+					m.focus = focusTabs
+				}
 			}
 		}
+
 	}
 	return m, nil
 }

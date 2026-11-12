@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Client talks to one Kubernetes cluster. Create it once with NewClient and
@@ -31,4 +32,37 @@ type Client struct {
 	// the API the clientset has no typed access to (the metrics). It is nil
 	// when there is no such access, as with a pretend cluster in tests.
 	rawGet func(ctx context.Context, path string) ([]byte, error)
+}
+
+// NewClient connects using your kubeconfig (~/.kube/config, or $KUBECONFIG),
+// the same way kubectl does, with its current context.
+func NewClient() (*Client, error) {
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		clientcmd.NewDefaultClientConfigLoadingRules(),
+		&clientcmd.ConfigOverrides{},
+	)
+
+	raw, err := loader.RawConfig() // to read the current context's name
+	if err != nil {
+		return nil, err
+	}
+	config, err := loader.ClientConfig() // connection settings: server, certs, token
+	if err != nil {
+		return nil, err
+	}
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	dyn, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		clientset: clientset,
+		dynamic:   dyn,
+		config:    config,
+		context:   raw.CurrentContext,
+	}, nil
 }

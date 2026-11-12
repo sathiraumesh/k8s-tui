@@ -11,9 +11,9 @@ var (
 	// activeTab draws the currently selected tab as a filled "pill".
 	ActiveTab = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(styles.ColorCream). // text color
-			Background(styles.Accent).     // fill behind the text
-			Padding(0, 2)                  // 0 lines top/bottom, 2 spaces left/right
+			Foreground(styles.OnAccent). // was styles.ColorCream
+			Background(styles.Accent).
+			Padding(0, 2) // 0 lines top/bottom, 2 spaces left/right
 
 	// inactiveTab draws the other tabs as plain gray text.
 	// Same padding as activeTab so tabs don't shift when switching.
@@ -30,11 +30,11 @@ var (
 
 	// selected highlights the row under the cursor in the list.
 	Selected = lipgloss.NewStyle().
-			Background(lipgloss.Color("#3A3A5C")). // soft purple-gray shade
-			Foreground(lipgloss.Color("#FFFFFF"))
+			Background(styles.Shade). // VS Code's selected-row blue
+			Foreground(styles.OnAccent)
 
 	// help draws the key-hint line at the bottom of the screen.
-	Help = lipgloss.NewStyle().Foreground(styles.Accent)
+	Help = lipgloss.NewStyle().Foreground(styles.Muted)
 )
 
 func (m Model) View() string {
@@ -42,11 +42,15 @@ func (m Model) View() string {
 		return "loading..."
 	}
 
-	// Tab bar
+	// Tab bar: underline the active tab only when the cursor is on the tabs
 	var tabs []string
 	for i, t := range m.tabs {
 		if i == m.active {
-			tabs = append(tabs, ActiveTab.Render(t))
+			style := ActiveTab
+			if m.focus == focusTabs {
+				style = style.Underline(true)
+			}
+			tabs = append(tabs, style.Render(t))
 		} else {
 			tabs = append(tabs, InactiveTab.Render(t))
 		}
@@ -60,20 +64,24 @@ func (m Model) View() string {
 	panelW := m.width - 2 // left + right border
 	panelH := bodyH - 2   // top + bottom border
 
-	// Single panel: list
+	// Single panel: list. Underline the selected row only when the cursor is on the list
 	rows := m.items[m.tabs[m.active]]
 	var list strings.Builder
 	for i, r := range rows {
 		if i == m.cursor {
-			list.WriteString(Selected.Width(panelW - 2).Render(r))
+			style := Selected.Width(panelW - 2)
+			if m.focus == focusList {
+				style = style.Underline(true)
+			}
+			list.WriteString(style.Render(r))
 		} else {
-			list.WriteString("  " + r)
+			list.WriteString(r)
 		}
 		list.WriteString("\n")
 	}
 	body := Panel.Width(panelW).Height(panelH).Render(list.String())
 
-	footer := Help.Render("tab/←→ switch tab • ↑↓ move • q quit")
+	footer := Help.Render("tab focus • ←→ switch tab • ↑↓ move • q quit")
 
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
 }

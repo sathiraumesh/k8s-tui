@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"k8s-tui/internal/kubernetes"
 	"k8s-tui/internal/mvc"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,8 +17,16 @@ type App struct {
 
 // New creates the App with its starting state.
 func New() *App {
+	client, err := kubernetes.NewClient()
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "unable to create kubernetes client:", err)
+		os.Exit(1)
+	}
+
 	return &App{
-		state: mvc.New(),
+		state:  mvc.New(),
+		client: client,
 	}
 }
 
