@@ -3,6 +3,7 @@ package mvc
 import (
 	"context"
 	"fmt"
+	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
 
@@ -20,7 +21,7 @@ func loadNodes(c *k8s.Client) tea.Cmd {
 		defer cancel()
 
 		nodes, err := c.ListNodes(ctx)
-		return itemsLoadedMsg{tab: "Nodes", rows: nodeRows(nodes), err: err}
+		return itemsLoadedMsg{tab: "Nodes", rows: nodeRows(nodes), err: err, at: time.Now()}
 	}
 }
 

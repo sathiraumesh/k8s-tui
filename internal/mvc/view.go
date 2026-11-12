@@ -57,10 +57,10 @@ func (m Model) View() string {
 	}
 	tabBar := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 
-	// Panel size: full width, full height minus the tab bar, gap and help line.
+	// Panel size: full width, full height minus the lines around it.
 	// Width/Height include padding but not the border or margin, so subtract those.
 	// If the total is taller than the terminal, the top lines (the tab bar) scroll off.
-	bodyH := m.height - 3 // tab bar + gap (Panel's MarginTop) + help line
+	bodyH := m.height - 4 // tab bar + gap (Panel's MarginTop) + status line + help line
 	panelW := m.width - 2 // left + right border
 	panelH := bodyH - 2   // top + bottom border
 
@@ -84,7 +84,14 @@ func (m Model) View() string {
 	}
 	body := Panel.Width(panelW).Height(panelH).Render(list.String())
 
-	footer := Help.Render("tab focus • ←→ switch tab • ↑↓ move • q quit")
+	// MaxWidth cuts a line off at the terminal edge instead of wrapping it,
+	// so a narrow terminal never gets an extra line. Every one-line part uses it:
+	// JoinVertical pads all lines to the widest one, so one wide line widens them all.
+	fit := lipgloss.NewStyle().MaxWidth(m.width)
 
-	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
+	tabBar = fit.Render(tabBar)
+	status := fit.Render(m.statusLine())
+	footer := fit.Render(Help.Render("tab focus • ←→ tab • ↑↓ move • a auto • f rate • q quit"))
+
+	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, status, footer)
 }

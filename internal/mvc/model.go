@@ -1,6 +1,8 @@
 package mvc
 
 import (
+	"time"
+
 	k8s "k8s-tui/internal/kubernetes"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -51,6 +53,21 @@ type Model struct {
 
 	// err is the last error from the cluster, shown in the panel. nil when all is fine.
 	err error
+
+	// autoRefresh is true while the active tab reloads by itself (status line: "● on").
+	// Toggled by KeyAutoRefresh.
+	autoRefresh bool
+
+	// refreshEvery is how often the active tab reloads: one of refreshRates.
+	// Cycled by KeyRefreshRate.
+	refreshEvery time.Duration
+
+	// tickGen is the generation of the running timer (see refreshTickMsg).
+	tickGen int
+
+	// updated is when each tab's data was last loaded, keyed by tab name.
+	// A tab that was never loaded has no entry.
+	updated map[string]time.Time
 }
 
 // New returns a Model with its starting state.
@@ -65,13 +82,16 @@ func New(client *k8s.Client) Model {
 			"Deployments": {"nginx", "api"},
 			"Services":    {"kubernetes", "nginx-svc", "redis"},
 		},
+		autoRefresh:  true,
+		refreshEvery: defaultRefresh,
+		updated:      map[string]time.Time{},
 	}
 }
 
-// Init runs once at start: begin loading the nodes from the cluster.
+// Init runs once at start: load the active tab now, and start the refresh timer.
 func (m Model) Init() tea.Cmd {
 	if m.client == nil {
-		return nil // tests: no cluster
+		return nil // tests: no cluster, no timer
 	}
-	return loadNodes(m.client)
+	return tea.Batch(m.loadActive(), m.startTimer())
 }

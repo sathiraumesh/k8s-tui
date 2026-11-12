@@ -11,6 +11,10 @@ const (
 	// Switch focus between the tab bar and the list
 	KeyTab = "tab"
 
+	// Auto refresh: turn it on/off, and cycle the rate 2s → 5s → 10s
+	KeyAutoRefresh = "a"
+	KeyRefreshRate = "f"
+
 	// Next tab
 	KeyRight = "right" // → arrow
 	KeyL     = "l"     // vim-style right

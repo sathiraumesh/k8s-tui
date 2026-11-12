@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
 
@@ -103,12 +104,16 @@ func TestInitWithoutClientLoadsNothing(t *testing.T) {
 
 func TestInitLoadsNodes(t *testing.T) {
 	client := k8s.NewClientFromClientset(fake.NewClientset(readyNode("worker1")))
-	cmd := New(client).Init()
-	if cmd == nil {
-		t.Fatal("Init returned nil, want a command that loads nodes")
+	m := New(client)
+	m.refreshEvery = time.Millisecond // so running the timer command doesn't wait 5s
+
+	// Init sends a batch: load the nodes now + start the refresh timer.
+	msgs := runBatch(t, m.Init())
+	if !hasLoaded(msgs, "Nodes") {
+		t.Errorf("Init sent %#v, want an itemsLoadedMsg for Nodes", msgs)
 	}
-	if msg, ok := cmd().(itemsLoadedMsg); !ok || msg.tab != "Nodes" {
-		t.Errorf("Init command sent %#v, want itemsLoadedMsg for Nodes", msg)
+	if !hasTick(msgs) {
+		t.Errorf("Init sent %#v, want a refreshTickMsg (timer started)", msgs)
 	}
 }
 
