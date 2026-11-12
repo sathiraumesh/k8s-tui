@@ -20,7 +20,7 @@ func (m Model) listHeight() int {
 // list (no empty rows at the bottom while there are rows above).
 func (m Model) keepCursorVisible() Model {
 	h := m.listHeight()
-	total := len(m.items[m.tabs[m.active]])
+	total := len(m.items[m.activeName()])
 
 	if m.cursor < m.offset {
 		m.offset = m.cursor // cursor went above the top: scroll up to it
@@ -35,7 +35,7 @@ func (m Model) keepCursorVisible() Model {
 // moveCursor moves the list's cursor by step rows (negative is up), stopping
 // at the first and last row, and scrolls so it stays on screen.
 func (m Model) moveCursor(step int) Model {
-	last := len(m.items[m.tabs[m.active]]) - 1
+	last := len(m.items[m.activeName()]) - 1
 	m.cursor = max(min(m.cursor+step, last), 0)
 	return m.keepCursorVisible()
 }

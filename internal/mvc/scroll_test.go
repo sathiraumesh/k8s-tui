@@ -245,10 +245,11 @@ func bottomBorder(t *testing.T, m Model) string {
 	return lines[len(lines)-2-panelMarginY]
 }
 
+// The scroll position is at the right end of the bottom border.
 func TestViewShowsScrollInfo(t *testing.T) {
 	m := inList(t, longList(t, 30))
-	if b := bottomBorder(t, m); !strings.HasPrefix(b, "└─ 1-9 of 30 ─") {
-		t.Errorf("bottom border = %q, want it to start with \"└─ 1-9 of 30 ─\"", b)
+	if b := strings.TrimRight(bottomBorder(t, m), " "); !strings.HasSuffix(b, " 1-9 of 30 ─┘") {
+		t.Errorf("bottom border = %q, want it to end with \" 1-9 of 30 ─┘\"", b)
 	}
 	m = press(t, m, pgDown)
 	if b := bottomBorder(t, m); !strings.Contains(b, "2-10 of 30") {
@@ -258,15 +259,15 @@ func TestViewShowsScrollInfo(t *testing.T) {
 
 func TestViewNoScrollInfoWhenEverythingFits(t *testing.T) {
 	b := bottomBorder(t, longList(t, 9))
-	if strings.Contains(b, "of") {
-		t.Errorf("bottom border = %q, want a plain border when all rows fit", b)
+	if strings.Contains(b, " of 9") {
+		t.Errorf("bottom border = %q, want no scroll position when all rows fit", b)
 	}
 }
 
-// The bottom border with the scroll info keeps the box's exact width.
-func TestWithScrollInfoKeepsWidth(t *testing.T) {
-	box := Panel.Width(40).Height(3).Render("x")
-	got := withScrollInfo(box, "4-9 of 30", lipgloss.Width(box))
+// The bottom border with the command and scroll info keeps the box's exact width.
+func TestWithCommandKeepsWidth(t *testing.T) {
+	box := Panel.Width(50).Height(3).Render("x")
+	got := withCommand(box, "kubectl get nodes", "4-9 of 30", lipgloss.Width(box))
 	for i, line := range strings.Split(got, "\n") {
 		if w := lipgloss.Width(line); w != lipgloss.Width(box) {
 			t.Errorf("line %d is %d wide, want %d: %q", i, w, lipgloss.Width(box), line)
@@ -277,9 +278,19 @@ func TestWithScrollInfoKeepsWidth(t *testing.T) {
 	}
 }
 
-func TestWithScrollInfoTooNarrow(t *testing.T) {
-	box := Panel.Width(6).Height(1).Render("x")
-	if got := withScrollInfo(box, "100-200 of 3000", lipgloss.Width(box)); got != box {
+// With no command, the scroll position still shows.
+func TestWithCommandOnlyInfo(t *testing.T) {
+	box := Panel.Width(40).Height(1).Render("x")
+	got := withCommand(box, "", "4-9 of 30", lipgloss.Width(box))
+	if last := strings.Split(got, "\n")[2]; !strings.HasPrefix(last, "└─ 4-9 of 30 ─") {
+		t.Errorf("bottom border = %q, want the scroll position", last)
+	}
+}
+
+// A border too narrow for anything keeps its plain line.
+func TestWithCommandTooNarrow(t *testing.T) {
+	box := Panel.Width(4).Height(1).Render("x")
+	if got := withCommand(box, "", "100-200 of 3000", lipgloss.Width(box)); got != box {
 		t.Errorf("box changed though the info doesn't fit:\n%s", got)
 	}
 }

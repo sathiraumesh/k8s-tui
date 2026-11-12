@@ -2,17 +2,24 @@ package mvc
 
 import (
 	"fmt"
-	"strings"
+
+	"k8s-tui/internal/styles"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Drawing the scroll position on the panel's bottom border:
+// Drawing the panel's bottom border: the kubectl command behind the list on
+// the left, and the scroll position on the right while the list is longer
+// than the panel:
 //
-//	└─ 4-9 of 30 ─────────────────────────────────────────────────┘
+//	└─ $ kubectl get nodes ───────────────────────────── 4-9 of 30 ─┘
 //
-// It is only shown when the list has more rows than fit. The scroll logic
-// is in scroll.go.
+// The scroll logic is in scroll.go; the command comes from kubectlCommand
+// (tabs.go).
+
+// commandStyle draws the kubectl command: light text, so it stands out from
+// the gray scroll position.
+var commandStyle = lipgloss.NewStyle().Foreground(styles.Text)
 
 // scrollInfo describes which rows are on screen, e.g. "4-9 of 30", or ""
 // when every row fits and there is nothing to scroll.
@@ -23,25 +30,23 @@ func scrollInfo(first, end, total, h int) string {
 	return fmt.Sprintf("%d-%d of %d", first+1, end, total)
 }
 
-// withScrollInfo redraws the last line of box, its bottom border, with info
-// set into it on the left. width is the box's full width. If info is "" or
-// doesn't fit, box is returned as it is.
-func withScrollInfo(box, info string, width int) string {
-	if info == "" {
-		return box
+// withCommand redraws the last line of box, its bottom border, with the
+// kubectl command on the left ("$ kubectl get nodes") and info on the right
+// (the scroll position; may be ""). width is the box's full width.
+//
+// A command too long for the border is cut off at its end. If there is no
+// room for info next to it, info is left out. With no command, only info is
+// shown.
+func withCommand(box, command, info string, width int) string {
+	left := ""
+	if command != "" {
+		// Room for the command: the width minus the corners, a border piece
+		// and a space on each side ("└─ " and " ─┘" = 6).
+		text := lipgloss.NewStyle().MaxWidth(max(width-6, 0)).Render("$ " + command)
+		left = borderLabel(commandStyle, text)
 	}
-	b := lipgloss.NormalBorder()
-	label := Help.Render(" " + info + " ")
-	fill := width - 3 - lipgloss.Width(label) // 3 = "└─" and "┘"
-	if fill < 1 {
-		return box
+	if left == "" {
+		return withBorderText(box, edgeBottom, borderLabel(Help, info), "", width)
 	}
-	bottom := borderLine.Render(b.BottomLeft+b.Bottom) + label +
-		borderLine.Render(strings.Repeat(b.Bottom, fill)+b.BottomRight)
-
-	i := strings.LastIndex(box, "\n")
-	if i < 0 {
-		return box
-	}
-	return box[:i+1] + bottom
+	return withBorderText(box, edgeBottom, left, borderLabel(Help, info), width)
 }

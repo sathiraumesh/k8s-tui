@@ -22,7 +22,7 @@ func loadNodes(c *k8s.Client, wide bool) tea.Cmd {
 		defer cancel()
 
 		nodes, err := c.ListNodes(ctx)
-		return itemsLoadedMsg{tab: "Nodes", rows: nodeRows(nodes, wide), err: err, at: time.Now(), wide: wide}
+		return itemsLoadedMsg{tab: tabNodes, rows: nodeRows(nodes, wide), err: err, at: time.Now(), wide: wide}
 	}
 }
 

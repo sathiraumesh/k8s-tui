@@ -18,8 +18,8 @@ import (
 // moreIndex is the index of the More tab.
 func moreIndex(t *testing.T, m Model) int {
 	t.Helper()
-	for i, tab := range m.tabs {
-		if tab == tabMore {
+	for i, tb := range m.tabs {
+		if tb.name == tabMore {
 			return i
 		}
 	}
@@ -132,7 +132,7 @@ func TestLoadResourcesError(t *testing.T) {
 
 func TestMoreTabIsLast(t *testing.T) {
 	m := New(nil)
-	if m.tabs[len(m.tabs)-1] != tabMore {
+	if m.tabs[len(m.tabs)-1].name != tabMore {
 		t.Errorf("tabs = %v, want More last", m.tabs)
 	}
 	if rows := m.items[tabMore]; len(rows) != 1 || rows[0] != "loading..." {

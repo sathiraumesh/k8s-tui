@@ -20,18 +20,16 @@ const (
 // Model is everything the app remembers between key presses.
 // Update changes it; View reads it to draw the screen.
 type Model struct {
-	// tabs are the names shown in the tab bar, in order.
-	// e.g. ["Nodes", "Pods", "Deployments", "Services"]
-	tabs []string
+	// tabs are the tabs in the tab bar, left to right (see tabs.go).
+	tabs []tab
 
 	// items holds the rows to list for each tab, keyed by tab name.
-	// e.g. items["Pods"] = ["nginx-...", "redis-0"]
-	// Placeholder data for now; later this comes from the cluster.
+	// e.g. items["Nodes"] = ["controlplane  Ready  v1.37.2", ...]
+	// Every tab starts as ["loading..."] until its loader sends its rows.
 	items map[string][]string
 
-	// active is the index of the selected tab in tabs.
-	// 0 = "Nodes", 1 = "Pods", 2 = "Deployments", 3 = "Services".
-	// Changed by tab / ← / →.
+	// active is the index of the selected tab in tabs: 0 is the first.
+	// Changed by ← / → (on the tabs or the list) and shift+tab.
 	active int
 
 	// cursor is the index of the highlighted row in the panel's list.
@@ -81,25 +79,19 @@ type Model struct {
 	wide map[string]bool
 }
 
-// Names of the tabs that are loaded from the cluster.
-const (
-	tabNodes = "Nodes"
-	tabMore  = "More" // every resource type the cluster serves, like `kubectl api-resources`
-)
-
-// New returns a Model with its starting state.
-// client may be nil (in tests); then nothing is loaded from a cluster.
+// New returns a Model with its starting state: the tabs of allTabs, each
+// showing "loading..." until its rows arrive.
+// client may be nil (in tests); then nothing is loaded.
 func New(client *k8s.Client) Model {
+	tabs := allTabs()
+	items := make(map[string][]string, len(tabs))
+	for _, t := range tabs {
+		items[t.name] = []string{"loading..."}
+	}
 	return Model{
-		client: client,
-		tabs:   []string{tabNodes, "Pods", "Deployments", "Services", tabMore},
-		items: map[string][]string{
-			tabNodes:      {"loading..."}, // replaced when the nodes arrive
-			"Pods":        {"nginx-7c5ddbdf54-abcde", "redis-0", "api-6f9d8b7c9-xyz12"},
-			"Deployments": {"nginx", "api"},
-			"Services":    {"kubernetes", "nginx-svc", "redis"},
-			tabMore:       {"loading..."}, // replaced when the resource types arrive
-		},
+		client:       client,
+		tabs:         tabs,
+		items:        items,
 		refreshEvery: defaultRefresh,
 		updated:      map[string]time.Time{},
 		wide:         map[string]bool{},
@@ -108,7 +100,7 @@ func New(client *k8s.Client) Model {
 
 // activeWide is whether the active tab shows its wide columns.
 func (m Model) activeWide() bool {
-	return m.wide[m.tabs[m.active]]
+	return m.wide[m.activeName()]
 }
 
 // Init runs once at start: load the active tab now, and start the refresh timer.

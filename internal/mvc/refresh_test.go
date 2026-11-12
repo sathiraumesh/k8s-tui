@@ -77,14 +77,18 @@ func TestTickReloadsActiveTabAndSchedulesNext(t *testing.T) {
 	}
 }
 
-// A tab without a loader (placeholder data) still keeps the timer going.
-func TestTickOnTabWithoutLoaderKeepsTicking(t *testing.T) {
+// A placeholder tab (not loaded from the cluster yet) is refreshed like any
+// other: the tick reloads it, and only it.
+func TestTickReloadsPlaceholderTab(t *testing.T) {
 	m := fastClient()
-	m.active = 1 // Pods: no loader yet
+	m.active = 1 // Pods: placeholder rows
 	_, cmd := m.Update(refreshTickMsg{})
 	msgs := runBatch(t, cmd)
-	if hasLoaded(msgs, "Pods") || hasLoaded(msgs, "Nodes") {
-		t.Errorf("tick sent %#v, want no load on a tab without a loader", msgs)
+	if !hasLoaded(msgs, tabPods) {
+		t.Errorf("tick sent %#v, want a reload of Pods", msgs)
+	}
+	if hasLoaded(msgs, tabNodes) {
+		t.Errorf("tick sent %#v, want only the active tab reloaded", msgs)
 	}
 	if !hasTick(msgs) {
 		t.Errorf("tick sent %#v, want the next tick scheduled", msgs)
@@ -304,7 +308,7 @@ func TestFocusUpGoesListButtonsTabs(t *testing.T) {
 func TestTabKeyStepsThroughButtons(t *testing.T) {
 	m := onScreen(t)
 	for _, want := range []focus{focusButtons, focusList, focusTabs} {
-		m = press(t, m, tab)
+		m = press(t, m, tabKey)
 		if m.focus != want {
 			t.Fatalf("focus = %d, want %d", m.focus, want)
 		}

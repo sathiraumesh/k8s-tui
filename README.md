@@ -6,13 +6,13 @@ A terminal UI for looking at a Kubernetes cluster, written in Go with
 cluster of your current kubeconfig context, the same one `kubectl` uses.
 
 ```
-  Nodes      Pods      Deployments      Services
+  Nodes      Pods      Deployments      Services      More
 
 ┌─  wide: off  ───  refresh: 5s  ──────────────── updated 14:30:05 ─┐
 │ controlplane                   Ready      v1.37.2                  │
 │ worker1                        Ready      v1.37.2                  │
 │ worker2                        Ready      v1.37.2                  │
-└────────────────────────────────────────────────────────────────────┘
+└─ $ kubectl get nodes ──────────────────────────────────────────────┘
 
 tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r refresh • q quit
 ```
@@ -20,12 +20,18 @@ tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r
 - **Nodes** are loaded live from the cluster: name, status and kubelet version.
 - **Wide** adds the columns of `kubectl get nodes -o wide`: internal and
   external IP, OS image, kernel version and container runtime.
+- **The kubectl command** behind what you see is on the panel's bottom
+  border, for example `$ kubectl get nodes -o wide`.
 - **Long lists scroll**: the panel shows the rows that fit, and the bottom
   border says which ones, for example `4-12 of 30`.
 - **Auto refresh** reloads the tab you're on every 2, 5 or 10 seconds, or
   not at all. The time of the last update shows in the top-right corner.
+- **More** lists every resource type the cluster serves, like
+  `kubectl api-resources` (with wide: the verbs and categories too). It is
+  loaded once, when you first open it.
 - **Pods, Deployments and Services** show placeholder rows for now; they
-  are not loaded from the cluster yet.
+  are not loaded from the cluster yet, but refresh and show their update
+  time like the other tabs.
 
 ## Run
 

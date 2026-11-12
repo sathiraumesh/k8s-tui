@@ -57,9 +57,9 @@ func (m Model) View() string {
 			if m.focus == focusTabs {
 				style = style.Underline(true)
 			}
-			tabs = append(tabs, style.Render(t))
+			tabs = append(tabs, style.Render(t.name))
 		} else {
-			tabs = append(tabs, InactiveTab.Render(t))
+			tabs = append(tabs, InactiveTab.Render(t.name))
 		}
 	}
 	tabBar := strings.Join(tabs, strings.Repeat(" ", tabGap))
@@ -73,7 +73,7 @@ func (m Model) View() string {
 
 	// Single panel: the rows that fit, from the scroll offset on.
 	// Underline the selected row only when the cursor is on the list.
-	rows := m.items[m.tabs[m.active]]
+	rows := m.items[m.activeName()]
 	if m.err != nil {
 		rows = []string{"error: " + m.err.Error()}
 	}
@@ -97,8 +97,10 @@ func (m Model) View() string {
 	}
 	body := Panel.Width(panelW).Height(panelH).Render(strings.Join(lines, "\n"))
 
-	// "4-9 of 30" on the bottom border while the list is longer than the panel.
-	body = withScrollInfo(body, scrollInfo(first, end, len(rows), panelH), lipgloss.Width(body))
+	// The bottom border: the kubectl command behind the list, and "4-9 of 30"
+	// while the list is longer than the panel.
+	info := scrollInfo(first, end, len(rows), panelH)
+	body = withCommand(body, m.kubectlCommand(), info, lipgloss.Width(body))
 
 	// Set the buttons into the panel's top border, right under the tabs.
 	// The one the cursor is on (if any) is underlined.

@@ -119,8 +119,8 @@ func TestInitLoadsNodes(t *testing.T) {
 
 func TestNodesStartAsLoading(t *testing.T) {
 	m := New(nil)
-	if m.tabs[0] != "Nodes" {
-		t.Errorf("first tab = %q, want Nodes", m.tabs[0])
+	if m.tabs[0].name != tabNodes {
+		t.Errorf("first tab = %q, want Nodes", m.tabs[0].name)
 	}
 	if rows := m.items["Nodes"]; len(rows) != 1 || rows[0] != "loading..." {
 		t.Errorf("Nodes rows = %q, want [loading...]", rows)

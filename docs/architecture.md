@@ -12,18 +12,23 @@ internal/
     client.go               Client, NewClient (reads the kubeconfig),
                             NewClientFromClientset (for tests)
     nodes.go                Node, ListNodes, and turning a client-go node into a Node
+    resources.go            Resource, ListResources: every resource type (More tab)
   mvc/                      the UI: state, key handling and drawing
+    tabs.go                 allTabs: every tab, its loader and whether it auto refreshes
     model.go                Model (all the state), New, Init
     controller.go           Update: what each message and key does
     view.go                 View: draws the screen; styles of tabs, panel, rows
     keys.go                 every key binding, as constants
     messages.go             every message type, and the refresh rates
     nodes_commands.go       loadNodes: the background call for the Nodes tab
+    resources_commands.go   loadResources: the background call for the More tab
     refresh.go              the auto refresh timer and rates (logic only)
     secondary_bar_view.go   the buttons on the panel's top border: wide,
                             refresh (drawing only)
     scroll.go               scrolling the list: listHeight, keepCursorVisible
-    scroll_view.go          "4-9 of 30" on the panel's bottom border
+    scroll_view.go          the bottom border: kubectl command, "4-9 of 30"
+    border_view.go          withBorderText: writes text into the top or
+                            bottom border (shared by both)
   styles/                   the colour palette
 examples/                   small stand-alone programs for learning Bubble Tea
                             and Lip Gloss; not part of the app
@@ -102,8 +107,24 @@ Init ──▶ tick(5s) ──▶ refreshTickMsg ──▶ Update ──▶ load
   a new timer with a new number, and `Update` drops ticks from older
   timers. Without this, a tick already on its way from the old timer would
   start a second timer, and the tab would reload twice as often.
-- `loadActive` picks the loader for the active tab. A tab with no loader
-  yet keeps its placeholder rows; the timer keeps running.
+- `loadActive` runs the active tab's loader from `allTabs`. A tab whose
+  `autoRefresh` is false (More) is skipped by the timer; the timer keeps
+  running for the other tabs.
+
+### Tabs
+
+Every tab is one entry in `allTabs` ([tabs.go](../internal/mvc/tabs.go)):
+its name, its `loader`, its kubectl `command` (shown on the bottom border,
+with ` -o wide` added by `kubectlCommand` while the tab is wide), and
+whether the timer reloads it. Nothing else in
+the app names a particular tab; `loadActive`, the buttons, the update time
+and the refresh timer all read this table.
+
+A tab that isn't loaded from the cluster yet (Pods, Deployments, Services)
+uses `placeholder(name, rows...)`: a loader that sends the same fixed rows
+through the same `itemsLoadedMsg` as a real loader. So it gets an update
+time, auto refresh and the wide setting like every other tab, and giving
+it real data later is a one-line change in `allTabs`.
 
 ### Wide columns
 
@@ -164,19 +185,24 @@ Lines that could be wider than the terminal (the tab bar and the help
 line) are cut off with `MaxWidth(m.width)` instead of wrapping, because a
 wrapped line is an extra row.
 
-**The top border.** Lip Gloss can't put text into a border, so
-[secondary_bar_view.go](../internal/mvc/secondary_bar_view.go) draws the panel
-normally and then replaces its first line (`withButtons`):
+**The borders.** Lip Gloss can't put text into a border, so the panel is
+drawn normally and then its top and bottom border lines are replaced by
+`withBorderText` ([border_view.go](../internal/mvc/border_view.go)), with
+text on the left and on the right:
 
 ```
-┌─ [button] ─────────── fill ─────────── updated 14:30:05 ─┐
+┌─ [wide] ─ [refresh] ──────── fill ──────── updated 14:30:05 ─┐   withButtons
+└─ $ kubectl get nodes ─────── fill ──────────────── 4-9 of 30 ─┘   withCommand
 ```
 
-The `─` fill is worked out so the line is exactly as wide as the box. If
-the time doesn't fit it is left out; if the button doesn't fit either, the
-plain border stays and the cursor skips the button (`buttonsShown`). The
-margins are added after `withButtons`, which needs the border to be the
-panel's first line.
+`withButtons` ([secondary_bar_view.go](../internal/mvc/secondary_bar_view.go))
+and `withCommand` ([scroll_view.go](../internal/mvc/scroll_view.go)) only
+choose the text; the drawing is shared. The `─` fill is worked out so the
+line is exactly as wide as the box. If the right part doesn't fit it is
+left out; if the left doesn't fit either, the plain border stays (and the
+cursor skips the buttons, see `buttonsShown`). A command too long for the
+border is cut off at its end. The margins are added after both, which need
+the borders to be the panel's first and last lines.
 
 ### Colours
 
@@ -196,13 +222,18 @@ Using Pods as the example:
    following [nodes.go](../internal/kubernetes/nodes.go).
 2. In `internal/mvc`, add `pods_commands.go` with `loadPods` and `podRows`,
    following [nodes_commands.go](../internal/mvc/nodes_commands.go). It
-   returns `itemsLoadedMsg{tab: "Pods", …}`.
-3. Add `case "Pods": return loadPods(m.client)` to `loadActive` in
-   [refresh.go](../internal/mvc/refresh.go).
-4. Optionally replace the placeholder rows in `New` with `{"loading..."}`.
+   returns `itemsLoadedMsg{tab: tabPods, …}`.
+3. In `allTabs` ([tabs.go](../internal/mvc/tabs.go)), replace
+   `placeholder(tabPods, …)` with `loadPods`.
 
 `Update` needs no change: it already handles `itemsLoadedMsg` for any
-tab, and auto refresh picks the new loader up through `loadActive`.
+tab, and auto refresh, wide and the update time work through `allTabs`.
+
+### Add a tab
+
+Add a name constant and one entry to `allTabs` in
+[tabs.go](../internal/mvc/tabs.go), with a loader (`placeholder(...)` to
+start with) and `autoRefresh`. The tab bar, buttons and timer pick it up.
 
 ### Add a key
 

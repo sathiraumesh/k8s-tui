@@ -61,11 +61,13 @@ Coming down from the tabs, the cursor lands on the first button, `wide`.
 | `pgdown` / `pgup` | a page (the rows that fit in the panel) down or up |
 | `←` / `→` | switch tab |
 
-When the list is longer than the panel, it scrolls to keep the cursor's
-row on screen, and the bottom border shows which rows you see:
+The bottom border shows the kubectl command that lists what you see (with
+`-o wide` while wide is on). When the list is longer than the panel, it
+scrolls to keep the cursor's row on screen, and the right end of the
+bottom border shows which rows you see:
 
 ```
-└─ 4-12 of 30 ──────────────────────────────────────────────┘
+└─ $ kubectl get nodes ─────────────────────────── 4-12 of 30 ─┘
 ```
 
 Rows wider than the panel are cut off at its edge. Switching tabs scrolls

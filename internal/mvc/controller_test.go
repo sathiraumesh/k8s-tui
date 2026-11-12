@@ -12,7 +12,7 @@ var (
 	up       = tea.KeyMsg{Type: tea.KeyUp}
 	left     = tea.KeyMsg{Type: tea.KeyLeft}
 	right    = tea.KeyMsg{Type: tea.KeyRight}
-	tab      = tea.KeyMsg{Type: tea.KeyTab}
+	tabKey   = tea.KeyMsg{Type: tea.KeyTab}
 	shiftTab = tea.KeyMsg{Type: tea.KeyShiftTab}
 	quit     = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")}
 	ctrlC    = tea.KeyMsg{Type: tea.KeyCtrlC}
@@ -66,9 +66,9 @@ func TestFocusMoves(t *testing.T) {
 		{"up in list moves cursor", []tea.Msg{down, down, up}, focusList, 0},
 		{"up on top row goes back to tabs", []tea.Msg{down, up}, focusTabs, 0},
 		{"up on tabs does nothing", []tea.Msg{up}, focusTabs, 0},
-		{"tab goes to list", []tea.Msg{tab}, focusList, 0},
-		{"tab twice goes back to tabs", []tea.Msg{tab, tab}, focusTabs, 0},
-		{"tab keeps cursor", []tea.Msg{down, down, tab, tab}, focusList, 1},
+		{"tab goes to list", []tea.Msg{tabKey}, focusList, 0},
+		{"tab twice goes back to tabs", []tea.Msg{tabKey, tabKey}, focusTabs, 0},
+		{"tab keeps cursor", []tea.Msg{down, down, tabKey, tabKey}, focusList, 1},
 		{"j and k work like down and up", []tea.Msg{j, j, k}, focusList, 0},
 	}
 	for _, tt := range tests {

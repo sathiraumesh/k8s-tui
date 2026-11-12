@@ -122,7 +122,7 @@ func (m Model) buttonsShown() bool {
 // On a tab that isn't auto refreshed (More) it is "loaded 14:30:05" instead,
 // shown whatever the refresh rate: the tab is loaded once, not kept updated.
 func (m Model) lastUpdated() string {
-	at, ok := m.updated[m.tabs[m.active]]
+	at, ok := m.updated[m.activeName()]
 	switch {
 	case !ok:
 		return ""
@@ -143,25 +143,5 @@ func (m Model) lastUpdated() string {
 // left out. If row doesn't fit either, box is returned as it is, with a
 // plain top border.
 func withButtons(box, row, right string, width int) string {
-	b := lipgloss.NormalBorder()
-
-	// The right corner: " updated 14:30:05 ─", in gray, before the "┐".
-	corner := ""
-	if right != "" {
-		corner = Help.Render(" "+right+" ") + borderLine.Render(b.Top)
-	}
-
-	fill := width - 3 - lipgloss.Width(row) - lipgloss.Width(corner) // 3 = "┌─" and "┐"
-	if fill < 1 && corner != "" {
-		corner = "" // no room for the time: keep just the buttons
-		fill = width - 3 - lipgloss.Width(row)
-	}
-	if fill < 1 {
-		return box
-	}
-	top := borderLine.Render(b.TopLeft+b.Top) + row +
-		borderLine.Render(strings.Repeat(b.Top, fill)) + corner + borderLine.Render(b.TopRight)
-
-	_, rest, _ := strings.Cut(box, "\n")
-	return top + "\n" + rest
+	return withBorderText(box, edgeTop, row, borderLabel(Help, right), width)
 }

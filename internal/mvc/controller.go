@@ -35,7 +35,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// A refresh can return fewer rows (a node was removed):
 		// keep the cursor on a row that still exists.
-		if msg.tab == m.tabs[m.active] {
+		if msg.tab == m.activeName() {
 			if m.cursor >= len(msg.rows) {
 				m.cursor = max(len(msg.rows)-1, 0)
 			}
@@ -153,7 +153,7 @@ func (m Model) switchTab(step int) (tea.Model, tea.Cmd) {
 	m.button = min(m.button, len(m.panelButtons())-1)
 
 	// A tab that isn't auto refreshed is loaded the first time it is opened.
-	if _, loaded := m.updated[m.tabs[m.active]]; !m.autoRefreshed() && loaded {
+	if _, loaded := m.updated[m.activeName()]; !m.autoRefreshed() && loaded {
 		return m, nil
 	}
 	return m, m.loadActive()
@@ -177,7 +177,7 @@ func (m Model) pressButton() (tea.Model, tea.Cmd) {
 // toggleWide turns the active tab's wide columns on or off, and reloads the
 // tab so its rows get the new columns. The rows on screen stay until then.
 func (m Model) toggleWide() (tea.Model, tea.Cmd) {
-	tab := m.tabs[m.active]
+	tab := m.activeName()
 	m.wide[tab] = !m.wide[tab]
 	return m, m.loadActive()
 }
