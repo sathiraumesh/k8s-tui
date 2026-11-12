@@ -37,6 +37,9 @@ var (
 	Help = lipgloss.NewStyle().Foreground(styles.Muted)
 )
 
+// tabGap is the number of empty columns between two tabs.
+const tabGap = 2
+
 func (m Model) View() string {
 	if m.width == 0 {
 		return "loading..."
@@ -55,12 +58,12 @@ func (m Model) View() string {
 			tabs = append(tabs, InactiveTab.Render(t))
 		}
 	}
-	tabBar := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+	tabBar := strings.Join(tabs, strings.Repeat(" ", tabGap))
 
 	// Panel size: full width, full height minus the lines around it.
 	// Width/Height include padding but not the border or margin, so subtract those.
 	// If the total is taller than the terminal, the top lines (the tab bar) scroll off.
-	bodyH := m.height - 4 // tab bar + gap (Panel's MarginTop) + status line + help line
+	bodyH := m.height - 3 // tab bar + gap (Panel's MarginTop) + help line
 	panelW := m.width - 2 // left + right border
 	panelH := bodyH - 2   // top + bottom border
 
@@ -84,14 +87,16 @@ func (m Model) View() string {
 	}
 	body := Panel.Width(panelW).Height(panelH).Render(list.String())
 
+	// Set the refresh buttons into the panel's top border, right under the tabs.
+	body = withButtons(body, m.refreshButtons(), lipgloss.Width(body))
+
 	// MaxWidth cuts a line off at the terminal edge instead of wrapping it,
 	// so a narrow terminal never gets an extra line. Every one-line part uses it:
 	// JoinVertical pads all lines to the widest one, so one wide line widens them all.
 	fit := lipgloss.NewStyle().MaxWidth(m.width)
 
 	tabBar = fit.Render(tabBar)
-	status := fit.Render(m.statusLine())
 	footer := fit.Render(Help.Render("tab focus • ←→ tab • ↑↓ move • a auto • f rate • q quit"))
 
-	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, status, footer)
+	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
 }

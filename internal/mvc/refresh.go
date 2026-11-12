@@ -3,10 +3,7 @@ package mvc
 import (
 	"time"
 
-	"k8s-tui/internal/styles"
-
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // Auto refresh: while it is on, a tick fires every refreshEvery; on each tick
@@ -15,6 +12,7 @@ import (
 //	Init ──▶ tick(5s) ──▶ refreshTickMsg ──▶ Update ──▶ loadActive + tick(5s) ──▶ ...
 //
 // Turning it off simply stops scheduling the next tick.
+// How the refresh state is drawn is in refresh_view.go.
 
 // tick returns a command that sends one refreshTickMsg after d.
 func tick(d time.Duration, gen int) tea.Cmd {
@@ -47,50 +45,4 @@ func (m Model) loadActive() tea.Cmd {
 		return loadNodes(m.client)
 	}
 	return nil // Pods, Deployments, Services: placeholder data for now
-}
-
-// Styles for the status line.
-var (
-	// statusOn is the "● on" badge while auto refresh is running.
-	statusOn = lipgloss.NewStyle().Foreground(styles.Accent).Bold(true)
-
-	// rateActive highlights the chosen rate, like the active tab.
-	rateActive = lipgloss.NewStyle().
-			Foreground(styles.OnAccent).
-			Background(styles.Accent).
-			Padding(0, 1)
-
-	// rateInactive is a rate that is not chosen; same padding so nothing shifts.
-	rateInactive = lipgloss.NewStyle().Foreground(styles.Muted).Padding(0, 1)
-)
-
-// statusLine is the line under the panel, e.g.
-//
-//	auto refresh ● on   2s [5s] 10s   updated 14:30:05
-//
-// The chosen rate is highlighted. "updated" is left out until the active
-// tab has loaded once.
-func (m Model) statusLine() string {
-	state := Help.Render("○ off")
-	if m.autoRefresh {
-		state = statusOn.Render("● on")
-	}
-
-	var rates []string
-	for _, r := range refreshRates {
-		if r == m.refreshEvery {
-			rates = append(rates, rateActive.Render(r.String()))
-		} else {
-			rates = append(rates, rateInactive.Render(r.String()))
-		}
-	}
-
-	parts := []string{
-		Help.Render("auto refresh "), state, "   ",
-		lipgloss.JoinHorizontal(lipgloss.Top, rates...),
-	}
-	if at, ok := m.updated[m.tabs[m.active]]; ok {
-		parts = append(parts, Help.Render("   updated "+at.Format("15:04:05")))
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }

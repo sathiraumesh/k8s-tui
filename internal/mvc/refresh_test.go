@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -212,53 +213,105 @@ func TestRateChangeWhileOffStartsNoTimer(t *testing.T) {
 	}
 }
 
-// ---------- status line ----------
+// ---------- buttons on the panel's top border ----------
 
-func TestStatusLine(t *testing.T) {
-	m := New(nil)
-	line := m.statusLine()
-	for _, want := range []string{"auto refresh", "● on", "2s", "5s", "10s"} {
-		if !strings.Contains(line, want) {
-			t.Errorf("status line %q is missing %q", line, want)
+// labels returns the buttons' labels, for comparing in tests.
+func labels(buttons []button) []string {
+	var out []string
+	for _, b := range buttons {
+		out = append(out, b.label)
+	}
+	return out
+}
+
+func TestRefreshButtonsOn(t *testing.T) {
+	buttons := New(nil).refreshButtons()
+	if got, want := labels(buttons), []string{"refresh: on", "every 5s"}; !slices.Equal(got, want) {
+		t.Errorf("labels = %q, want %q", got, want)
+	}
+	for _, b := range buttons {
+		if !b.on {
+			t.Errorf("button %q is off, want on while auto refresh runs", b.label)
 		}
 	}
-	if strings.Contains(line, "updated") {
-		t.Errorf("status line %q shows updated before the first load", line)
-	}
+}
 
+func TestRefreshButtonsOff(t *testing.T) {
+	buttons := press(t, New(nil), autoKey).refreshButtons()
+	if got, want := labels(buttons), []string{"refresh: off", "every 5s"}; !slices.Equal(got, want) {
+		t.Errorf("labels = %q, want %q", got, want)
+	}
+	for _, b := range buttons {
+		if b.on {
+			t.Errorf("button %q is on, want off (gray) while auto refresh is off", b.label)
+		}
+	}
+}
+
+func TestRefreshButtonsShowRate(t *testing.T) {
+	buttons := press(t, New(nil), rateKey).refreshButtons() // 5s → 10s
+	if got := buttons[1].label; got != "every 10s" {
+		t.Errorf("rate button = %q, want every 10s", got)
+	}
+}
+
+func TestRefreshButtonsUpdatedTime(t *testing.T) {
 	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
-	m = press(t, m, itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at})
-	if line := m.statusLine(); !strings.Contains(line, "updated 14:30:05") {
-		t.Errorf("status line %q, want it to show updated 14:30:05", line)
+	m := press(t, New(nil), itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at})
+	if got := labels(m.refreshButtons()); !slices.Contains(got, "updated 14:30:05") {
+		t.Errorf("labels = %q, want updated 14:30:05", got)
 	}
 
 	// "updated" belongs to the active tab: Pods has never loaded.
 	m.active = 1
-	if line := m.statusLine(); strings.Contains(line, "updated") {
-		t.Errorf("on Pods: status line %q, want no updated time", line)
+	for _, l := range labels(m.refreshButtons()) {
+		if strings.HasPrefix(l, "updated") {
+			t.Errorf("on Pods: labels show %q, want no updated time", l)
+		}
 	}
 }
 
-func TestStatusLineShowsOff(t *testing.T) {
-	m := press(t, New(nil), autoKey)
-	if line := m.statusLine(); !strings.Contains(line, "○ off") {
-		t.Errorf("status line %q, want ○ off", line)
-	}
-}
-
-// The status line sits just above the help line.
-func TestViewShowsStatusLine(t *testing.T) {
+// The buttons sit in the panel's top border: the line right under the tabs.
+func TestViewButtonsOnPanelTopBorder(t *testing.T) {
 	lines := strings.Split(sized(t, New(nil), 80, 24).View(), "\n")
-	status := lines[len(lines)-2]
-	if !strings.Contains(status, "auto refresh") {
-		t.Errorf("second to last line %q, want the status line", status)
+	top := lines[1]
+	if !strings.HasPrefix(top, "┌─") || !strings.HasSuffix(strings.TrimRight(top, " "), "┐") {
+		t.Errorf("line under the tabs %q, want the panel's top border", top)
+	}
+	for _, want := range []string{"refresh: on", "every 5s"} {
+		if !strings.Contains(top, want) {
+			t.Errorf("top border %q is missing %q", top, want)
+		}
 	}
 }
 
-// On a narrow terminal the status and help lines are cut off, not wrapped.
-func TestViewStatusAndHelpFitWidth(t *testing.T) {
-	lines := strings.Split(sized(t, New(nil), 30, 24).View(), "\n")
-	for _, line := range lines[len(lines)-2:] {
+// The top border with buttons is exactly as wide as the rest of the box.
+func TestWithButtonsKeepsWidth(t *testing.T) {
+	box := Panel.Width(40).Height(3).Render("x")
+	got := withButtons(box, []button{{label: "refresh: on", on: true}, {label: "every 5s"}}, lipgloss.Width(box))
+	lines := strings.Split(got, "\n")
+	for i, line := range lines {
+		if w := lipgloss.Width(line); w != lipgloss.Width(box) {
+			t.Errorf("line %d is %d wide, want %d: %q", i, w, lipgloss.Width(box), line)
+		}
+	}
+	if len(lines) != lipgloss.Height(box) {
+		t.Errorf("got %d lines, want %d (no line added or lost)", len(lines), lipgloss.Height(box))
+	}
+}
+
+// When the buttons don't fit, the box keeps a plain top border.
+func TestWithButtonsTooNarrow(t *testing.T) {
+	box := Panel.Width(10).Height(1).Render("x")
+	got := withButtons(box, []button{{label: "refresh: on", on: true}}, lipgloss.Width(box))
+	if got != box {
+		t.Errorf("box changed though the buttons don't fit:\n%s", got)
+	}
+}
+
+// On a narrow terminal no line is wider than the terminal.
+func TestViewFitsWidthWhenNarrow(t *testing.T) {
+	for _, line := range strings.Split(sized(t, New(nil), 30, 24).View(), "\n") {
 		if w := lipgloss.Width(line); w > 30 {
 			t.Errorf("line %q is %d wide, want at most 30", line, w)
 		}
