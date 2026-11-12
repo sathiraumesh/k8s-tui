@@ -18,7 +18,7 @@ const (
 // Update changes it; View reads it to draw the screen.
 type Model struct {
 	// tabs are the names shown in the tab bar, in order.
-	// e.g. ["Pods", "Deployments", "Services"]
+	// e.g. ["Nodes", "Pods", "Deployments", "Services"]
 	tabs []string
 
 	// items holds the rows to list for each tab, keyed by tab name.
@@ -27,7 +27,7 @@ type Model struct {
 	items map[string][]string
 
 	// active is the index of the selected tab in tabs.
-	// 0 = "Pods", 1 = "Deployments", 2 = "Services".
+	// 0 = "Nodes", 1 = "Pods", 2 = "Deployments", 3 = "Services".
 	// Changed by tab / ← / →.
 	active int
 
@@ -45,6 +45,7 @@ type Model struct {
 	// Starts as focusTabs (0). Changed by tab, ↓ from the tabs,
 	// and ↑ from the top row of the list.
 	focus focus
+
 	// client talks to the cluster. nil in tests, so nothing is loaded there.
 	client *k8s.Client
 
@@ -52,12 +53,14 @@ type Model struct {
 	err error
 }
 
-// New returns a Model with its starting state (placeholder data for now).
-func New() Model {
+// New returns a Model with its starting state.
+// client may be nil (in tests); then nothing is loaded from a cluster.
+func New(client *k8s.Client) Model {
 	return Model{
-		tabs: []string{"Nodes", "Pods", "Deployments", "Services"},
+		client: client,
+		tabs:   []string{"Nodes", "Pods", "Deployments", "Services"},
 		items: map[string][]string{
-			"Nodes":       {"loading..."},
+			"Nodes":       {"loading..."}, // replaced when the nodes arrive
 			"Pods":        {"nginx-7c5ddbdf54-abcde", "redis-0", "api-6f9d8b7c9-xyz12"},
 			"Deployments": {"nginx", "api"},
 			"Services":    {"kubernetes", "nginx-svc", "redis"},
@@ -65,6 +68,10 @@ func New() Model {
 	}
 }
 
+// Init runs once at start: begin loading the nodes from the cluster.
 func (m Model) Init() tea.Cmd {
-	return nil
+	if m.client == nil {
+		return nil // tests: no cluster
+	}
+	return loadNodes(m.client)
 }

@@ -11,8 +11,7 @@ import (
 
 // App wires the pieces together and runs the TUI.
 type App struct {
-	state  mvc.Model
-	client *kubernetes.Client // not used yet; nil until Kubernetes is wired in
+	state mvc.Model
 }
 
 // New creates the App with its starting state.
@@ -25,8 +24,7 @@ func New() *App {
 	}
 
 	return &App{
-		state:  mvc.New(),
-		client: client,
+		state: mvc.New(client),
 	}
 }
 

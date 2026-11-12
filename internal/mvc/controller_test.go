@@ -22,6 +22,14 @@ var (
 	l        = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}
 )
 
+// testModel returns a model with no cluster (nil client) and three fake
+// nodes on the first tab, so the tests have rows to move through.
+func testModel() Model {
+	m := New(nil)
+	m.items["Nodes"] = []string{"node-a", "node-b", "node-c"}
+	return m
+}
+
 // press sends each message to Update in order and returns the final model.
 func press(t *testing.T, m Model, msgs ...tea.Msg) Model {
 	t.Helper()
@@ -33,14 +41,14 @@ func press(t *testing.T, m Model, msgs ...tea.Msg) Model {
 }
 
 func TestStartsOnTabs(t *testing.T) {
-	m := New()
+	m := testModel()
 	if m.focus != focusTabs || m.active != 0 || m.cursor != 0 {
 		t.Fatalf("got focus=%d active=%d cursor=%d, want focusTabs, 0, 0", m.focus, m.active, m.cursor)
 	}
 }
 
 func TestWindowSize(t *testing.T) {
-	m := press(t, New(), tea.WindowSizeMsg{Width: 80, Height: 24})
+	m := press(t, testModel(), tea.WindowSizeMsg{Width: 80, Height: 24})
 	if m.width != 80 || m.height != 24 {
 		t.Fatalf("got %dx%d, want 80x24", m.width, m.height)
 	}
@@ -65,7 +73,7 @@ func TestFocusMoves(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := press(t, New(), tt.keys...)
+			m := press(t, testModel(), tt.keys...)
 			if m.focus != tt.wantFocus || m.cursor != tt.wantCursor {
 				t.Fatalf("got focus=%d cursor=%d, want focus=%d cursor=%d",
 					m.focus, m.cursor, tt.wantFocus, tt.wantCursor)
@@ -75,8 +83,8 @@ func TestFocusMoves(t *testing.T) {
 }
 
 func TestCursorStopsAtLastRow(t *testing.T) {
-	m := New()
-	last := len(m.items["Pods"]) - 1
+	m := testModel()
+	last := len(m.items["Nodes"]) - 1
 
 	// Enter the list, then press down many more times than there are rows.
 	m = press(t, m, down)
@@ -99,12 +107,12 @@ func TestSwitchTabs(t *testing.T) {
 		{"left goes to previous tab", []tea.Msg{right, left}, 0},
 		{"h goes to previous tab", []tea.Msg{right, h}, 0},
 		{"shift+tab goes to previous tab", []tea.Msg{right, shiftTab}, 0},
-		{"right on last tab wraps to first", []tea.Msg{right, right, right}, 0},
-		{"left on first tab wraps to last", []tea.Msg{left}, 2},
+		{"right on last tab wraps to first", []tea.Msg{right, right, right, right}, 0},
+		{"left on first tab wraps to last", []tea.Msg{left}, 3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := press(t, New(), tt.keys...)
+			m := press(t, testModel(), tt.keys...)
 			if m.active != tt.wantActive {
 				t.Fatalf("active = %d, want %d", m.active, tt.wantActive)
 			}
@@ -114,7 +122,7 @@ func TestSwitchTabs(t *testing.T) {
 
 func TestSwitchTabResetsCursor(t *testing.T) {
 	// Move to row 2 in the list, then switch tab.
-	m := press(t, New(), down, down, down, right)
+	m := press(t, testModel(), down, down, down, right)
 	if m.cursor != 0 {
 		t.Fatalf("cursor = %d after switching tab, want 0", m.cursor)
 	}
@@ -123,7 +131,7 @@ func TestSwitchTabResetsCursor(t *testing.T) {
 func TestQuit(t *testing.T) {
 	for _, key := range []tea.KeyMsg{quit, ctrlC} {
 		t.Run(key.String(), func(t *testing.T) {
-			_, cmd := New().Update(key)
+			_, cmd := testModel().Update(key)
 			if cmd == nil {
 				t.Fatal("got no command, want tea.Quit")
 			}

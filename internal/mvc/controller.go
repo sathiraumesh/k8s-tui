@@ -7,6 +7,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 
+	// A tab's data arrived from the cluster (see commands.go).
+	case itemsLoadedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			return m, nil
+		}
+		m.err = nil
+		m.items[msg.tab] = msg.rows
+
 	case tea.KeyMsg:
 		rows := m.items[m.tabs[m.active]]
 		switch msg.String() {

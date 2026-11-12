@@ -66,6 +66,9 @@ func (m Model) View() string {
 
 	// Single panel: list. Underline the selected row only when the cursor is on the list
 	rows := m.items[m.tabs[m.active]]
+	if m.err != nil {
+		rows = []string{"error: " + m.err.Error()}
+	}
 	var list strings.Builder
 	for i, r := range rows {
 		if i == m.cursor {

@@ -16,7 +16,7 @@ func sized(t *testing.T, m Model, w, h int) Model {
 }
 
 func TestViewLoadingBeforeSize(t *testing.T) {
-	if got := New().View(); got != "loading..." {
+	if got := testModel().View(); got != "loading..." {
 		t.Fatalf("View() = %q, want %q", got, "loading...")
 	}
 }
@@ -32,7 +32,7 @@ func TestViewFitsTerminal(t *testing.T) {
 	}
 	for _, s := range sizes {
 		t.Run(fmt.Sprintf("%dx%d", s.w, s.h), func(t *testing.T) {
-			out := sized(t, New(), s.w, s.h).View()
+			out := sized(t, testModel(), s.w, s.h).View()
 			if got := lipgloss.Height(out); got != s.h {
 				t.Errorf("height = %d, want %d", got, s.h)
 			}
@@ -45,9 +45,9 @@ func TestViewFitsTerminal(t *testing.T) {
 
 // The tab bar must be the first line, or it has scrolled off.
 func TestViewTabBarOnFirstLine(t *testing.T) {
-	out := sized(t, New(), 80, 24).View()
+	out := sized(t, testModel(), 80, 24).View()
 	first := strings.Split(out, "\n")[0]
-	for _, name := range []string{"Pods", "Deployments", "Services"} {
+	for _, name := range []string{"Nodes", "Pods", "Deployments", "Services"} {
 		if !strings.Contains(first, name) {
 			t.Errorf("first line %q is missing tab %q", first, name)
 		}
@@ -55,8 +55,8 @@ func TestViewTabBarOnFirstLine(t *testing.T) {
 }
 
 func TestViewShowsActiveTabRows(t *testing.T) {
-	m := sized(t, New(), 80, 24)
-	m = press(t, m, right) // Deployments
+	m := sized(t, testModel(), 80, 24)
+	m = press(t, m, right, right) // Nodes → Pods → Deployments
 	out := m.View()
 	for _, row := range m.items["Deployments"] {
 		if !strings.Contains(out, row) {
@@ -69,8 +69,8 @@ func TestViewShowsActiveTabRows(t *testing.T) {
 }
 
 func TestViewEmptyTab(t *testing.T) {
-	m := New()
-	m.items["Pods"] = nil
+	m := testModel()
+	m.items["Nodes"] = nil
 	out := sized(t, m, 80, 24).View() // must not panic
 	if got := lipgloss.Height(out); got != 24 {
 		t.Errorf("height = %d, want 24", got)
@@ -81,15 +81,15 @@ func TestViewEmptyTab(t *testing.T) {
 func TestViewTinyTerminal(t *testing.T) {
 	for _, s := range []struct{ w, h int }{{20, 5}, {10, 3}, {1, 1}} {
 		t.Run(fmt.Sprintf("%dx%d", s.w, s.h), func(t *testing.T) {
-			_ = sized(t, New(), s.w, s.h).View()
+			_ = sized(t, testModel(), s.w, s.h).View()
 		})
 	}
 }
 
 // A row longer than the panel must not make the screen taller.
 func TestViewLongRowDoesNotGrowScreen(t *testing.T) {
-	m := New()
-	m.items["Pods"] = []string{strings.Repeat("x", 200)}
+	m := testModel()
+	m.items["Nodes"] = []string{strings.Repeat("x", 200)}
 	out := sized(t, m, 60, 15).View()
 	if got := lipgloss.Height(out); got != 15 {
 		t.Errorf("height = %d, want 15", got)
@@ -98,12 +98,12 @@ func TestViewLongRowDoesNotGrowScreen(t *testing.T) {
 
 // More rows than fit in the panel must not make the screen taller.
 func TestViewManyRowsDoNotGrowScreen(t *testing.T) {
-	m := New()
+	m := testModel()
 	var rows []string
 	for i := range 50 {
 		rows = append(rows, fmt.Sprintf("pod-%d", i))
 	}
-	m.items["Pods"] = rows
+	m.items["Nodes"] = rows
 	out := sized(t, m, 60, 15).View()
 	if got := lipgloss.Height(out); got != 15 {
 		t.Errorf("height = %d, want 15", got)
