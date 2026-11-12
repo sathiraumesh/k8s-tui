@@ -30,6 +30,11 @@ type itemsLoadedMsg struct {
 	rows []string  // one line of text per item
 	err  error     // set if the API call failed
 	at   time.Time // when the data was fetched; shown as "updated 12:04:05"
+
+	// wide is whether the rows have the wide columns. If the tab's wide
+	// setting changed while the load was on its way, Update drops the rows:
+	// they have the wrong columns, and a load with the right ones follows.
+	wide bool
 }
 
 // refreshTickMsg is sent every refreshEvery. Update reloads the active tab

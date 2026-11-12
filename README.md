@@ -8,16 +8,18 @@ cluster of your current kubeconfig context, the same one `kubectl` uses.
 ```
   Nodes      Pods      Deployments      Services
 
-┌─  refresh: 5s  ───────────────────────────────── updated 14:30:05 ─┐
+┌─  wide: off  ───  refresh: 5s  ──────────────── updated 14:30:05 ─┐
 │ controlplane                   Ready      v1.37.2                  │
 │ worker1                        Ready      v1.37.2                  │
 │ worker2                        Ready      v1.37.2                  │
 └────────────────────────────────────────────────────────────────────┘
 
-tab focus • ←→ tab/button • ↑↓ move • enter press • r refresh • q quit
+tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r refresh • q quit
 ```
 
 - **Nodes** are loaded live from the cluster: name, status and kubelet version.
+- **Wide** adds the columns of `kubectl get nodes -o wide`: internal and
+  external IP, OS image, kernel version and container runtime.
 - **Auto refresh** reloads the tab you're on every 2, 5 or 10 seconds, or
   not at all. The time of the last update shows in the top-right corner.
 - **Pods, Deployments and Services** show placeholder rows for now; they
@@ -46,11 +48,12 @@ cluster can't be reached, the panel shows the error instead of the rows.
 
 | Key | Does |
 |---|---|
-| `←` `→` (or `h` `l`) | switch tab; on the refresh button, move between buttons |
-| `↑` `↓` (or `k` `j`) | move between the tabs, the refresh button and the list, and through the list |
-| `tab` | step the focus: tabs → refresh button → list |
+| `←` `→` (or `h` `l`) | switch tab; on the buttons, move between them |
+| `↑` `↓` (or `k` `j`) | move between the tabs, the buttons and the list, and through the list |
+| `tab` | step the focus: tabs → buttons → list |
 | `shift+tab` | previous tab |
-| `enter` / `space` | press the refresh button (when the cursor is on it) |
+| `enter` / `space` | press the button the cursor is on |
+| `w` | wide columns on/off for the tab you're on, from anywhere |
 | `r` | change the refresh rate from anywhere: off → 2s → 5s → 10s |
 | `q` / `ctrl+c` | quit |
 
@@ -71,4 +74,4 @@ off the top.
 
 - [Keys](docs/keys.md): every key, and where the cursor can be
 - [Architecture](docs/architecture.md): how the code is organised, and how
-  to add a tab, a key or a style
+  to add a tab, a key or a button

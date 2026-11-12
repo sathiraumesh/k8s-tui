@@ -94,7 +94,7 @@ func (m Model) View() string {
 	// Set the buttons into the panel's top border, right under the tabs.
 	// The one the cursor is on (if any) is underlined.
 	if m.buttonsShown() {
-		row := buttonRow(m.refreshButtons(), m.focusedButton())
+		row := buttonRow(m.panelButtons(), m.focusedButton())
 		body = withButtons(body, row, m.lastUpdated(), lipgloss.Width(body))
 	}
 
@@ -108,7 +108,7 @@ func (m Model) View() string {
 	fit := lipgloss.NewStyle().MaxWidth(m.width)
 
 	tabBar = fit.Render(tabBar)
-	footer := fit.Render(Help.Render("tab focus • ←→ tab/button • ↑↓ move • enter press • r refresh • q quit"))
+	footer := fit.Render(Help.Render("tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r refresh • q quit"))
 
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
 }

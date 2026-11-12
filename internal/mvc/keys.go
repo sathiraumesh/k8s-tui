@@ -18,6 +18,9 @@ const (
 	// Step the refresh rate from anywhere: off → 2s → 5s → 10s → off
 	KeyRefreshRate = "r"
 
+	// Turn the active tab's wide columns on/off from anywhere
+	KeyWide = "w"
+
 	// Next tab (on the buttons: next button)
 	KeyRight = "right" // → arrow
 	KeyL     = "l"     // vim-style right

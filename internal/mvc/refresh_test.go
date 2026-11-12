@@ -200,26 +200,37 @@ func TestOldTickIgnored(t *testing.T) {
 
 // ---------- the refresh button on the panel's top border ----------
 
+// buttonNamed returns the button with the given name from m's buttons.
+func buttonNamed(t *testing.T, m Model, name string) button {
+	t.Helper()
+	for _, b := range m.panelButtons() {
+		if b.name == name {
+			return b
+		}
+	}
+	t.Fatalf("no %q button in %+v", name, m.panelButtons())
+	return button{}
+}
+
 func TestRefreshButtonOn(t *testing.T) {
-	b := New(nil).refreshButtons()
-	if len(b) != 1 || b[0].label != "refresh: 5s" || !b[0].on || b[0].name != buttonRefresh {
-		t.Errorf("buttons = %+v, want one green refresh button \"refresh: 5s\"", b)
+	b := buttonNamed(t, New(nil), buttonRefresh)
+	if b.label != "refresh: 5s" || !b.on {
+		t.Errorf("refresh button = %+v, want green \"refresh: 5s\"", b)
 	}
 }
 
 func TestRefreshButtonOff(t *testing.T) {
 	m := New(nil)
 	m.refreshEvery = refreshOff
-	b := m.refreshButtons()
-	if len(b) != 1 || b[0].label != "refresh: off" || b[0].on {
-		t.Errorf("buttons = %+v, want one gray refresh button \"refresh: off\"", b)
+	if b := buttonNamed(t, m, buttonRefresh); b.label != "refresh: off" || b.on {
+		t.Errorf("refresh button = %+v, want gray \"refresh: off\"", b)
 	}
 }
 
 func TestRefreshButtonShowsNewRate(t *testing.T) {
-	b := press(t, New(nil), rateKey).refreshButtons() // 5s → 10s
-	if b[0].label != "refresh: 10s" {
-		t.Errorf("label = %q, want refresh: 10s", b[0].label)
+	b := buttonNamed(t, press(t, New(nil), rateKey), buttonRefresh) // 5s → 10s
+	if b.label != "refresh: 10s" {
+		t.Errorf("label = %q, want refresh: 10s", b.label)
 	}
 }
 
@@ -307,14 +318,26 @@ func TestArrowsOnButtonsDontSwitchTab(t *testing.T) {
 		t.Errorf("active tab = %d, want 0 (unchanged)", m.active)
 	}
 	if m.button != 0 {
-		t.Errorf("button = %d, want 0 (there is only one)", m.button)
+		t.Errorf("button = %d, want 0 (→ then ←)", m.button)
+	}
+}
+
+// → and ← stop at the last and first button instead of wrapping.
+func TestButtonCursorStopsAtEnds(t *testing.T) {
+	m := press(t, onScreen(t), down, right, right, right)
+	if last := len(m.panelButtons()) - 1; m.button != last {
+		t.Errorf("button = %d after many →, want the last one (%d)", m.button, last)
+	}
+	m = press(t, m, left, left, left)
+	if m.button != 0 {
+		t.Errorf("button = %d after many ←, want 0", m.button)
 	}
 }
 
 func TestEnterAndSpacePressRefreshButton(t *testing.T) {
 	for _, key := range []tea.KeyMsg{enterKey, spaceKey} {
 		t.Run(key.String(), func(t *testing.T) {
-			m := press(t, onScreen(t), down, key) // focus buttons, press
+			m := press(t, onScreen(t), down, right, key) // buttons, → to refresh, press
 			if m.refreshEvery != refreshSlow {
 				t.Errorf("refreshEvery = %s, want 10s after pressing the button", m.refreshEvery)
 			}

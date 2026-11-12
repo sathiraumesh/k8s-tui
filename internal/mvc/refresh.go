@@ -12,7 +12,7 @@ import (
 //	Init ──▶ tick(5s) ──▶ refreshTickMsg ──▶ Update ──▶ loadActive + tick(5s) ──▶ ...
 //
 // Setting the rate to off (0) simply stops scheduling the next tick.
-// How the refresh state is drawn is in refresh_view.go.
+// How the refresh state is drawn is in secondary_bar_view.go.
 
 // tick returns a command that sends one refreshTickMsg after d.
 func tick(d time.Duration, gen int) tea.Cmd {
@@ -58,7 +58,7 @@ func (m Model) loadActive() tea.Cmd {
 	}
 	switch m.tabs[m.active] {
 	case "Nodes":
-		return loadNodes(m.client)
+		return loadNodes(m.client, m.wide["Nodes"])
 	}
 	return nil // Pods, Deployments, Services: placeholder data for now
 }

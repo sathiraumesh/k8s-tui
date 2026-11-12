@@ -17,6 +17,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// A tab's data arrived from the cluster (see nodes_commands.go).
 	case itemsLoadedMsg:
+		// Rows with the wrong columns: wide was switched while they were on
+		// their way. The load that switch started brings the right ones.
+		if msg.wide != m.wide[msg.tab] {
+			return m, nil
+		}
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
@@ -54,6 +59,10 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case KeyRefreshRate:
 		return m.stepRefresh()
 
+	// w: wide columns on/off from anywhere, same as pressing the button.
+	case KeyWide:
+		return m.toggleWide()
+
 	// tab: step the focus tabs → buttons → list → tabs.
 	case KeyTab:
 		switch m.focus {
@@ -74,7 +83,7 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// → : next button on the buttons, otherwise next tab.
 	case KeyRight, KeyL:
 		if m.focus == focusButtons {
-			m.button = min(m.button+1, len(m.refreshButtons())-1)
+			m.button = min(m.button+1, len(m.panelButtons())-1)
 			return m, nil
 		}
 		return m.switchTab(+1)
@@ -130,15 +139,25 @@ func (m Model) switchTab(step int) (tea.Model, tea.Cmd) {
 
 // pressButton does what the button the cursor is on does.
 func (m Model) pressButton() (tea.Model, tea.Cmd) {
-	buttons := m.refreshButtons()
+	buttons := m.panelButtons()
 	if m.button < 0 || m.button >= len(buttons) {
 		return m, nil
 	}
 	switch buttons[m.button].name {
+	case buttonWide:
+		return m.toggleWide()
 	case buttonRefresh:
 		return m.stepRefresh()
 	}
 	return m, nil
+}
+
+// toggleWide turns the active tab's wide columns on or off, and reloads the
+// tab so its rows get the new columns. The rows on screen stay until then.
+func (m Model) toggleWide() (tea.Model, tea.Cmd) {
+	tab := m.tabs[m.active]
+	m.wide[tab] = !m.wide[tab]
+	return m, m.loadActive()
 }
 
 // belowTabs is where the focus goes coming down from the tabs: the buttons

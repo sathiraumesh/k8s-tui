@@ -8,17 +8,21 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// View code for the buttons set into the panel's top border:
+// The secondary bar: the buttons set into the panel's top border, under the tabs:
 //
-//	┌─  refresh: 5s  ──────────────────────────────────────────────┐
+//	┌─  wide: off  ───  refresh: 5s  ─────────────── updated 14:30:05 ─┐
 //
-// Only drawing lives here; the refresh logic (timer, rates, loading) is in refresh.go.
+// Only drawing lives here; the refresh logic (timer, rates, loading) is in
+// refresh.go, and what pressing a button does is in controller.go.
 
 // buttonGap is the number of border pieces (─) between two buttons.
 const buttonGap = 3
 
 // Button names, so Update knows which button was pressed.
-const buttonRefresh = "refresh"
+const (
+	buttonWide    = "wide"
+	buttonRefresh = "refresh"
+)
 
 // button is one label set into the panel's top border, e.g. "refresh: 5s".
 type button struct {
@@ -59,13 +63,25 @@ func (b button) render(focused bool) string {
 	return s.Render(b.label)
 }
 
-// refreshButtons are the buttons on the panel's top border: one refresh
-// button showing the rate, "refresh: 5s", or "refresh: off".
-func (m Model) refreshButtons() []button {
-	if m.refreshEvery == refreshOff {
-		return []button{{name: buttonRefresh, label: "refresh: off"}}
+// panelButtons are the buttons on the panel's top border, left to right
+// (same order as systems-programing):
+//
+//	[wide: off] [refresh: 5s]
+//
+// Each is green when on: wide while the active tab shows its wide columns,
+// refresh while auto refresh runs.
+func (m Model) panelButtons() []button {
+	wide := button{name: buttonWide, label: "wide: off"}
+	if m.activeWide() {
+		wide.label, wide.on = "wide: on", true
 	}
-	return []button{{name: buttonRefresh, label: "refresh: " + m.refreshEvery.String(), on: true}}
+
+	refresh := button{name: buttonRefresh, label: "refresh: off"}
+	if m.refreshEvery != refreshOff {
+		refresh.label, refresh.on = "refresh: "+m.refreshEvery.String(), true
+	}
+
+	return []button{wide, refresh}
 }
 
 // focusedButton is the index of the button the cursor is on, or -1 if the
@@ -91,7 +107,7 @@ func buttonRow(buttons []button, focused int) string {
 // corners and one piece of border on each side take 4 columns. When they
 // don't fit they are not drawn, and the cursor skips them.
 func (m Model) buttonsShown() bool {
-	return lipgloss.Width(buttonRow(m.refreshButtons(), -1)) <= m.width-4
+	return lipgloss.Width(buttonRow(m.panelButtons(), -1)) <= m.width-4
 }
 
 // lastUpdated is the text for the right corner of the top border,

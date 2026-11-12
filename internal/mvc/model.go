@@ -69,6 +69,11 @@ type Model struct {
 	// updated is when each tab's data was last loaded, keyed by tab name.
 	// A tab that was never loaded has no entry.
 	updated map[string]time.Time
+
+	// wide is whether a tab shows its wide columns (like `kubectl get -o wide`),
+	// keyed by tab name. Each tab has its own setting; a missing entry is off.
+	// Toggled by the wide button or KeyWide.
+	wide map[string]bool
 }
 
 // New returns a Model with its starting state.
@@ -85,7 +90,13 @@ func New(client *k8s.Client) Model {
 		},
 		refreshEvery: defaultRefresh,
 		updated:      map[string]time.Time{},
+		wide:         map[string]bool{},
 	}
+}
+
+// activeWide is whether the active tab shows its wide columns.
+func (m Model) activeWide() bool {
+	return m.wide[m.tabs[m.active]]
 }
 
 // Init runs once at start: load the active tab now, and start the refresh timer.

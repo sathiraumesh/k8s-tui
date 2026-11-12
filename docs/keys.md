@@ -10,24 +10,24 @@ The cursor (the *focus*) is always in one of three places. The arrow keys
 do different things in each.
 
 ```
-  Nodes      Pods      Deployments      Services        ← 1. tabs
+  Nodes      Pods      Deployments      Services                 ← 1. tabs
 
-┌─  refresh: 5s  ─────────────────── updated 14:30:05 ─┐ ← 2. refresh button
-│ controlplane         Ready      v1.37.2              │ ← 3. list
-│ worker1              Ready      v1.37.2              │
-└──────────────────────────────────────────────────────┘
+┌─  wide: off  ───  refresh: 5s  ──────────── updated 14:30:05 ─┐ ← 2. buttons
+│ controlplane   Ready   v1.37.2                                │ ← 3. list
+│ worker1        Ready   v1.37.2                                │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-The part the cursor is on is underlined: the active tab, the refresh
-button, or the selected row. The app starts with the cursor on the tabs.
+The part the cursor is on is underlined: the active tab, a button, or the
+selected row. The app starts with the cursor on the tabs.
 
 ```
-tabs  ──↓──▶  refresh button  ──↓──▶  list
-      ◀──↑──                  ◀──↑──  (from the list's top row)
+tabs  ──↓──▶  buttons  ──↓──▶  list
+      ◀──↑──           ◀──↑──  (from the list's top row)
 ```
 
-If the terminal is too narrow for the refresh button, it isn't drawn and
-the cursor skips it: `↓` from the tabs goes straight to the list.
+If the terminal is too narrow for the buttons, they aren't drawn and the
+cursor skips them: `↓` from the tabs goes straight to the list.
 
 ## On the tabs
 
@@ -35,18 +35,20 @@ the cursor skips it: `↓` from the tabs goes straight to the list.
 |---|---|
 | `←` / `h` | previous tab |
 | `→` / `l` | next tab |
-| `↓` / `j` | go to the refresh button |
+| `↓` / `j` | go to the buttons |
 
 Switching tabs loads the new tab straight away and puts the list's cursor
 back on the first row. The tabs wrap around: `→` on the last tab goes to
 the first.
 
-## On the refresh button
+## On the buttons
+
+Coming down from the tabs, the cursor lands on the first button, `wide`.
 
 | Key | Does |
 |---|---|
-| `enter` / `space` | step the refresh rate: off → 2s → 5s → 10s → off |
-| `←` / `→` | move between buttons (there is only one for now) |
+| `←` / `→` | move between the buttons (stops at the first and the last) |
+| `enter` / `space` | press the button: switch wide on/off, or step the refresh rate |
 | `↑` / `k` | go to the tabs |
 | `↓` / `j` | go to the list |
 
@@ -55,17 +57,35 @@ the first.
 | Key | Does |
 |---|---|
 | `↓` / `j` | next row (stops at the last one) |
-| `↑` / `k` | previous row; on the first row, go to the refresh button |
+| `↑` / `k` | previous row; on the first row, go to the buttons |
 | `←` / `→` | switch tab |
 
 ## Anywhere
 
 | Key | Does |
 |---|---|
-| `tab` | step the focus: tabs → refresh button → list → tabs |
+| `tab` | step the focus: tabs → buttons → list → tabs |
 | `shift+tab` | previous tab |
+| `w` | wide columns on/off, the same as pressing the wide button |
 | `r` | step the refresh rate, the same as pressing the refresh button |
 | `q` / `ctrl+c` | quit |
+
+## Wide columns
+
+The wide button shows `wide: off` (dark gray) or `wide: on` (green). Wide
+adds the columns `kubectl get nodes -o wide` shows:
+
+| Normal | Wide adds |
+|---|---|
+| NAME, STATUS, VERSION | INTERNAL-IP, EXTERNAL-IP, OS-IMAGE, KERNEL-VERSION, CONTAINER-RUNTIME |
+
+An empty external IP shows as `<none>`, as in kubectl.
+
+Each tab has its own setting: switching wide on for Nodes leaves the
+other tabs as they were. Switching it reloads the tab with the new
+columns; the rows on screen stay until the new ones arrive. Auto refresh
+keeps the tab's setting. (Pods, Deployments and Services have no wide
+columns yet.)
 
 ## Auto refresh
 

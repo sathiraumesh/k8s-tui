@@ -30,7 +30,7 @@ func TestNodeRows(t *testing.T) {
 	rows := nodeRows([]k8s.Node{
 		{Name: "controlplane", Status: "Ready", Version: "v1.37.2"},
 		{Name: "worker1", Status: "NotReady", Version: "v1.36.0"},
-	})
+	}, false)
 	if len(rows) != 2 {
 		t.Fatalf("got %d rows, want 2", len(rows))
 	}
@@ -51,14 +51,14 @@ func TestNodeRowsAligned(t *testing.T) {
 	rows := nodeRows([]k8s.Node{
 		{Name: "a", Status: "Ready", Version: "v1"},
 		{Name: "a-much-longer-node-name", Status: "Ready", Version: "v1"},
-	})
+	}, false)
 	if strings.Index(rows[0], "Ready") != strings.Index(rows[1], "Ready") {
 		t.Errorf("status columns not aligned:\n%q\n%q", rows[0], rows[1])
 	}
 }
 
 func TestNodeRowsEmpty(t *testing.T) {
-	if rows := nodeRows(nil); len(rows) != 0 {
+	if rows := nodeRows(nil, false); len(rows) != 0 {
 		t.Errorf("got %v, want no rows", rows)
 	}
 }
@@ -66,7 +66,7 @@ func TestNodeRowsEmpty(t *testing.T) {
 func TestLoadNodes(t *testing.T) {
 	client := k8s.NewClientFromClientset(fake.NewClientset(readyNode("worker1"), readyNode("controlplane")))
 
-	msg, ok := loadNodes(client)().(itemsLoadedMsg)
+	msg, ok := loadNodes(client, false)().(itemsLoadedMsg)
 	if !ok {
 		t.Fatalf("loadNodes sent %T, want itemsLoadedMsg", msg)
 	}
@@ -87,7 +87,7 @@ func TestLoadNodesError(t *testing.T) {
 		return true, nil, errors.New("connection refused")
 	})
 
-	msg := loadNodes(k8s.NewClientFromClientset(cs))().(itemsLoadedMsg)
+	msg := loadNodes(k8s.NewClientFromClientset(cs), false)().(itemsLoadedMsg)
 	if msg.err == nil {
 		t.Fatal("err = nil, want an error")
 	}

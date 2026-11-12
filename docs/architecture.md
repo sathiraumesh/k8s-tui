@@ -20,7 +20,8 @@ internal/
     messages.go             every message type, and the refresh rates
     nodes_commands.go       loadNodes: the background call for the Nodes tab
     refresh.go              the auto refresh timer and rates (logic only)
-    refresh_view.go         the refresh button and the top border (drawing only)
+    secondary_bar_view.go   the buttons on the panel's top border: wide,
+                            refresh (drawing only)
   styles/                   the colour palette
 examples/                   small stand-alone programs for learning Bubble Tea
                             and Lip Gloss; not part of the app
@@ -70,7 +71,7 @@ Bubble Tea runs in the background. When it finishes, it returns a
 Init / Update ──returns──▶ loadNodes(client)        (nodes_commands.go)
                                 │ runs in the background: client.ListNodes
                                 ▼
-                    itemsLoadedMsg{tab, rows, err, at}   (messages.go)
+                    itemsLoadedMsg{tab, rows, err, at, wide}   (messages.go)
                                 │
                                 ▼
                    Update stores rows in m.items[tab] ──▶ View draws them
@@ -101,6 +102,20 @@ Init ──▶ tick(5s) ──▶ refreshTickMsg ──▶ Update ──▶ load
   start a second timer, and the tab would reload twice as often.
 - `loadActive` picks the loader for the active tab. A tab with no loader
   yet keeps its placeholder rows; the timer keeps running.
+
+### Wide columns
+
+`m.wide` holds each tab's wide setting, keyed by tab name. `toggleWide`
+(the `w` key, or the wide button) flips it for the active tab and reloads
+the tab. The loader gets the setting (`loadNodes(client, wide)`) and builds
+rows with or without the wide columns; `alignColumns` in
+[nodes_commands.go](../internal/mvc/nodes_commands.go) pads every column
+to its widest cell so they line up.
+
+A load already on its way when wide is switched would arrive with the old
+columns. So `itemsLoadedMsg` carries the `wide` it was loaded with, and
+`Update` drops rows whose `wide` no longer matches the tab's setting; the
+load the switch started brings the right ones.
 
 ### Drawing the screen
 
@@ -133,7 +148,7 @@ line) are cut off with `MaxWidth(m.width)` instead of wrapping, because a
 wrapped line is an extra row.
 
 **The top border.** Lip Gloss can't put text into a border, so
-[refresh_view.go](../internal/mvc/refresh_view.go) draws the panel
+[secondary_bar_view.go](../internal/mvc/secondary_bar_view.go) draws the panel
 normally and then replaces its first line (`withButtons`):
 
 ```
@@ -190,8 +205,8 @@ tab, and auto refresh picks the new loader up through `loadActive`.
 ### Add a button to the top border
 
 1. Add a name constant next to `buttonRefresh` in
-   [refresh_view.go](../internal/mvc/refresh_view.go), and append the
-   button in `refreshButtons` (or a new function that returns the list).
+   [secondary_bar_view.go](../internal/mvc/secondary_bar_view.go), and append the
+   button in `panelButtons` (or a new function that returns the list).
 2. Add a `case` for its name to `pressButton` in
    [controller.go](../internal/mvc/controller.go).
 
