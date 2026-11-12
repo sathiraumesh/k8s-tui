@@ -11,9 +11,17 @@ const (
 	// Step focus: tab bar → buttons → list → tab bar
 	KeyTab = "tab"
 
-	// Press the button the cursor is on
+	// Press the button the cursor is on; on the list, open the row's actions;
+	// in the action list, pick one. space also ticks a flag.
 	KeyEnter = "enter"
 	KeySpace = " "
+
+	// Go back from a page (action list, flags, text) to the one before
+	KeyEsc = "esc"
+
+	// Run / cancel an action that changes the cluster
+	KeyYes = "y"
+	KeyNo  = "n"
 
 	// Step the refresh rate from anywhere: off → 2s → 5s → 10s → off
 	KeyRefreshRate = "r"

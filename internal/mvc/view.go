@@ -71,13 +71,12 @@ func (m Model) View() string {
 	panelH := m.listHeight() // rows inside the panel (see scroll.go)
 	innerW := panelW - 2     // minus Panel's Padding(0, 1) on each side
 
-	// Single panel: the rows that fit, from the scroll offset on.
-	// Underline the selected row only when the cursor is on the list.
-	rows := m.items[m.activeName()]
-	if m.err != nil {
-		rows = []string{"error: " + m.err.Error()}
-	}
-	first, end := visibleRange(m.offset, len(rows), panelH)
+	// Single panel: the tab's rows or the open page (actions_view.go), the
+	// rows that fit from the scroll offset on. The selected row is
+	// underlined while the cursor is there.
+	c := m.content()
+	rows := c.rows
+	first, end := visibleRange(c.offset, len(rows), panelH)
 
 	// A row longer than the panel is cut off at its edge: a wrapped row would
 	// take two lines and push the panel taller than the screen.
@@ -86,9 +85,9 @@ func (m Model) View() string {
 	lines := make([]string, 0, end-first)
 	for i := first; i < end; i++ {
 		line := cut.Render(rows[i])
-		if i == m.cursor {
+		if i == c.cursor {
 			style := Selected.Width(innerW)
-			if m.focus == focusList {
+			if m.cursorShown() {
 				style = style.Underline(true)
 			}
 			line = style.Render(line)
@@ -102,9 +101,11 @@ func (m Model) View() string {
 	info := scrollInfo(first, end, len(rows), panelH)
 	body = withCommand(body, m.kubectlCommand(), info, lipgloss.Width(body))
 
-	// Set the buttons into the panel's top border, right under the tabs.
-	// The one the cursor is on (if any) is underlined.
-	if m.buttonsShown() {
+	// The top border, right under the tabs: the title of the open page, or
+	// the buttons (the one the cursor is on, if any, underlined).
+	if title := m.overlayTitle(); title != "" {
+		body = withBorderText(body, edgeTop, borderLabel(commandStyle, title), "", lipgloss.Width(body))
+	} else if m.buttonsShown() {
 		row := buttonRow(m.panelButtons(), m.focusedButton())
 		body = withButtons(body, row, m.lastUpdated(), lipgloss.Width(body))
 	}
@@ -119,7 +120,7 @@ func (m Model) View() string {
 	fit := lipgloss.NewStyle().MaxWidth(m.width)
 
 	tabBar = fit.Render(tabBar)
-	footer := fit.Render(Help.Render("tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r refresh • q quit"))
+	footer := fit.Render(Help.Render(m.helpText()))
 
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
 }

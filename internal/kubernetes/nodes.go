@@ -2,12 +2,15 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubectl/pkg/describe"
 )
 
 // Node is one machine in the cluster (`kubectl get nodes -o wide`).
@@ -97,4 +100,46 @@ func nodeRoles(n corev1.Node) []string {
 	}
 	sort.Strings(roles) // map order is random; sort so the output is stable
 	return roles
+}
+
+// ---------- actions: things that can be done to one node ----------
+
+// Each matches a kubectl command.
+
+// Cordon marks the node as unschedulable, so no new pods are placed on it,
+// like `kubectl cordon NAME`. The pods already on it keep running.
+//
+// With dryRun the cluster checks the change but doesn't save it, like
+// `kubectl cordon NAME --dry-run=server`.
+func (c *Client) Cordon(ctx context.Context, name string, dryRun bool) error {
+	return c.setUnschedulable(ctx, name, true, dryRun)
+}
+
+// Uncordon lets new pods be placed on the node again, like
+// `kubectl uncordon NAME` (and `--dry-run=server` with dryRun).
+func (c *Client) Uncordon(ctx context.Context, name string, dryRun bool) error {
+	return c.setUnschedulable(ctx, name, false, dryRun)
+}
+
+// setUnschedulable sets the node's spec.unschedulable, which is what
+// cordon and uncordon change.
+func (c *Client) setUnschedulable(ctx context.Context, name string, unschedulable, dryRun bool) error {
+	patch := fmt.Appendf(nil, `{"spec":{"unschedulable":%t}}`, unschedulable)
+	opts := metav1.PatchOptions{}
+	if dryRun {
+		opts.DryRun = []string{metav1.DryRunAll}
+	}
+	_, err := c.clientset.CoreV1().Nodes().Patch(ctx, name, types.StrategicMergePatchType, patch, opts)
+	return err
+}
+
+// DescribeNode returns what `kubectl describe node NAME` prints, using
+// kubectl's own describer, so the text is the same. With showEvents false
+// the events at the end are left out (`--show-events=false`).
+//
+// kubectl's describer takes no context, so ctx can't cancel it; the
+// client's own timeouts still apply.
+func (c *Client) DescribeNode(_ context.Context, name string, showEvents bool) (string, error) {
+	d := &describe.NodeDescriber{Interface: c.clientset}
+	return d.Describe("", name, describe.DescriberSettings{ShowEvents: showEvents, ChunkSize: 500})
 }

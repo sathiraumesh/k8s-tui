@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,5 +176,100 @@ func TestListNodesError(t *testing.T) {
 	}
 	if nodes != nil {
 		t.Errorf("nodes = %v, want nil on error", nodes)
+	}
+}
+
+// ---------- actions ----------
+
+// unschedulable reads back whether the node is cordoned on the fake cluster.
+func unschedulable(t *testing.T, cs *fake.Clientset, name string) bool {
+	t.Helper()
+	n, err := cs.CoreV1().Nodes().Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n.Spec.Unschedulable
+}
+
+func TestCordon(t *testing.T) {
+	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, nil))
+	if err := NewClientFromClientset(cs).Cordon(context.Background(), "worker1", false); err != nil {
+		t.Fatal(err)
+	}
+	if !unschedulable(t, cs, "worker1") {
+		t.Error("node is schedulable after Cordon, want unschedulable")
+	}
+}
+
+func TestUncordon(t *testing.T) {
+	n := fakeNode("worker1", corev1.ConditionTrue, nil)
+	n.Spec.Unschedulable = true
+	cs := fake.NewClientset(n)
+	if err := NewClientFromClientset(cs).Uncordon(context.Background(), "worker1", false); err != nil {
+		t.Fatal(err)
+	}
+	if unschedulable(t, cs, "worker1") {
+		t.Error("node is unschedulable after Uncordon, want schedulable")
+	}
+}
+
+// Cordon and uncordon send a patch of spec.unschedulable, with the dry-run
+// option only when asked for.
+func TestCordonPatch(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, nil))
+		var got k8stesting.PatchAction
+		cs.PrependReactor("patch", "nodes", func(a k8stesting.Action) (bool, runtime.Object, error) {
+			got = a.(k8stesting.PatchAction)
+			return false, nil, nil // let the fake cluster apply it too
+		})
+		if err := NewClientFromClientset(cs).Cordon(context.Background(), "worker1", dryRun); err != nil {
+			t.Fatal(err)
+		}
+		if got == nil || got.GetName() != "worker1" || string(got.GetPatch()) != `{"spec":{"unschedulable":true}}` {
+			t.Errorf("dryRun=%v: patch = %+v", dryRun, got)
+		}
+		if patch, ok := got.(k8stesting.PatchActionImpl); ok {
+			isDryRun := len(patch.PatchOptions.DryRun) == 1 && patch.PatchOptions.DryRun[0] == metav1.DryRunAll
+			if isDryRun != dryRun {
+				t.Errorf("dryRun=%v: patch options = %+v", dryRun, patch.PatchOptions)
+			}
+		}
+	}
+}
+
+func TestCordonMissingNode(t *testing.T) {
+	err := NewClientFromClientset(fake.NewClientset()).Cordon(context.Background(), "nope", false)
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("err = %v, want not found", err)
+	}
+}
+
+func TestCordonError(t *testing.T) {
+	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, nil))
+	cs.PrependReactor("patch", "nodes", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("forbidden")
+	})
+	if err := NewClientFromClientset(cs).Cordon(context.Background(), "worker1", false); err == nil {
+		t.Error("err = nil, want forbidden")
+	}
+}
+
+func TestDescribeNode(t *testing.T) {
+	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, map[string]string{"node-role.kubernetes.io/worker": ""}))
+	text, err := NewClientFromClientset(cs).DescribeNode(context.Background(), "worker1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Name:", "worker1", "Roles:", "worker", "v1.37.2"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("describe output is missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestDescribeMissingNode(t *testing.T) {
+	if _, err := NewClientFromClientset(fake.NewClientset()).DescribeNode(context.Background(), "nope", true); err == nil {
+		t.Error("err = nil, want an error for a node that doesn't exist")
 	}
 }

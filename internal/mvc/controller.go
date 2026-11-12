@@ -42,7 +42,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.keepCursorVisible()
 		}
 
+	// An action finished (actions.go).
+	case actionDoneMsg:
+		return m.onActionDone(msg)
+
 	case tea.KeyMsg:
+		m.notice = "" // a key press clears the last action's message
+		if m.overlay != overlayNone {
+			return m.onOverlayKey(msg.String())
+		}
 		return m.onKey(msg)
 	}
 	return m, nil
@@ -79,9 +87,13 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	// enter / space: press the button the cursor is on.
+	// On the list, enter opens the row's actions (actions.go).
 	case KeyEnter, KeySpace:
 		if m.focus == focusButtons {
 			return m.pressButton()
+		}
+		if msg.String() == KeyEnter && m.focus == focusList && m.canOpenActions() {
+			return m.openActions(), nil
 		}
 
 	// → : next button on the buttons, otherwise next tab.

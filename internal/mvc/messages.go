@@ -46,3 +46,14 @@ type itemsLoadedMsg struct {
 type refreshTickMsg struct {
 	gen int
 }
+
+// actionDoneMsg is sent when an action (actions.go) has run.
+type actionDoneMsg struct {
+	action string // its name, e.g. "Cordon"
+	target string // the row it was run on, e.g. "worker1"
+	err    error  // set if it failed
+
+	text    string // what a read action returned, e.g. the Describe text
+	changed bool   // it was a change: the tab is reloaded to show it
+	dryRun  bool   // it was a change run with --dry-run=server: nothing was saved
+}

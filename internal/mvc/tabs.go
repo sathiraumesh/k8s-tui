@@ -38,6 +38,10 @@ type tab struct {
 	// " -o wide" added while the tab shows its wide columns.
 	command string
 
+	// actions are what can be done to a row of the tab: enter on a row
+	// opens them (actions.go). nil if the tab has none.
+	actions []action
+
 	// autoRefresh is whether the refresh timer reloads the tab. A tab that
 	// isn't auto refreshed is loaded the first time it is opened, and again
 	// when its wide setting changes; it has no refresh button.
@@ -51,6 +55,7 @@ func allTabs() []tab {
 			name:        tabNodes,
 			load:        loadNodes,
 			command:     "kubectl get nodes",
+			actions:     nodeActions(),
 			autoRefresh: true,
 		},
 		{
@@ -82,7 +87,16 @@ func allTabs() []tab {
 
 // kubectlCommand is the kubectl command behind what the active tab shows,
 // e.g. "kubectl get nodes -o wide" while Nodes shows its wide columns.
+//
+// While a page is open it is the action's command instead: the selected
+// one in the action list, the chosen one with its ticked flags after that.
 func (m Model) kubectlCommand() string {
+	switch m.overlay {
+	case overlayActions:
+		return m.actions()[m.overlayCursor].commandFor(m.target, m.actions()[m.overlayCursor].flags)
+	case overlayConfirm, overlayText:
+		return m.chosen().commandFor(m.target, m.flags)
+	}
 	cmd := m.activeTab().command
 	if cmd != "" && m.activeWide() {
 		cmd += " -o wide"

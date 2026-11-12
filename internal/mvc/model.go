@@ -73,6 +73,31 @@ type Model struct {
 	// A tab that was never loaded has no entry.
 	updated map[string]time.Time
 
+	// overlay is the page open on top of the list, if any (actions.go):
+	// the action list, the chosen action's flags, or a page of text.
+	overlay overlay
+
+	// target is the name of the row the actions are for, e.g. "worker1".
+	target string
+
+	// overlayCursor is the selected line of the open page: an action in the
+	// action list, or a flag on the confirm page.
+	overlayCursor int
+
+	// chosenAction is the index of the action picked from the action list,
+	// and flags are its flags as ticked on the confirm page.
+	chosenAction int
+	flags        []flag
+
+	// text is the lines of the text page (what a read action returned), and
+	// textOffset how far it is scrolled down.
+	text       []string
+	textOffset int
+
+	// notice is a one-line message shown in place of the help line, e.g.
+	// "Cordon worker1: done". It is cleared by the next key press.
+	notice string
+
 	// wide is whether a tab shows its wide columns (like `kubectl get -o wide`),
 	// keyed by tab name. Each tab has its own setting; a missing entry is off.
 	// Toggled by the wide button or KeyWide.

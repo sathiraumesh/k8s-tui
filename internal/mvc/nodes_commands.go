@@ -82,3 +82,47 @@ func alignColumns(rows [][]string) []string {
 	}
 	return lines
 }
+
+// ---------- actions ----------
+
+// flagNoEvents leaves the events out of Describe.
+const flagNoEvents = "--show-events=false"
+
+// nodeActions are the actions of the Nodes tab: enter on a node opens them.
+// The cluster calls they make are in internal/kubernetes/nodes.go.
+func nodeActions() []action {
+	return []action{
+		{
+			key: "d", name: "Describe", about: "everything about the node, like kubectl describe",
+			flags:   []flag{{name: flagNoEvents}},
+			command: "kubectl describe node %s",
+			run: func(c *k8s.Client, target string, flags []flag) tea.Cmd {
+				return read("Describe", target, func(ctx context.Context) (string, error) {
+					return c.DescribeNode(ctx, target, !ticked(flags, flagNoEvents))
+				})
+			},
+		},
+		{
+			key: "c", name: "Cordon", about: "stop new pods from being placed on the node",
+			changes: true,
+			flags:   []flag{{name: flagDryRun}},
+			command: "kubectl cordon %s",
+			run: func(c *k8s.Client, target string, flags []flag) tea.Cmd {
+				return change("Cordon", target, flags, func(ctx context.Context) error {
+					return c.Cordon(ctx, target, ticked(flags, flagDryRun))
+				})
+			},
+		},
+		{
+			key: "u", name: "Uncordon", about: "let new pods onto the node again",
+			changes: true,
+			flags:   []flag{{name: flagDryRun}},
+			command: "kubectl uncordon %s",
+			run: func(c *k8s.Client, target string, flags []flag) tea.Cmd {
+				return change("Uncordon", target, flags, func(ctx context.Context) error {
+					return c.Uncordon(ctx, target, ticked(flags, flagDryRun))
+				})
+			},
+		},
+	}
+}
