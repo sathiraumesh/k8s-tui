@@ -10,7 +10,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Time to refresh: reload the active tab and schedule the next tick.
 	// Drop ticks from an old timer, and stop when auto refresh is off.
 	case refreshTickMsg:
-		if msg.gen != m.tickGen || !m.autoRefresh {
+		if msg.gen != m.tickGen || m.refreshEvery == refreshOff {
 			return m, nil
 		}
 		return m, tea.Batch(m.loadActive(), m.startTimer())
@@ -32,65 +32,129 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		rows := m.items[m.tabs[m.active]]
-		switch msg.String() {
-		case KeyQuit, KeyCtrlC:
-			return m, tea.Quit
+		return m.onKey(msg)
+	}
+	return m, nil
+}
 
-		// a: turn auto refresh on/off. Turning it on reloads now and starts a new timer.
-		case KeyAutoRefresh:
-			m.autoRefresh = !m.autoRefresh
-			m.tickGen++ // any tick still on its way is from the old timer
-			if m.autoRefresh {
-				return m, tea.Batch(m.loadActive(), m.startTimer())
-			}
+// onKey handles a key press. Where the cursor is (m.focus) decides what the
+// arrow keys do:
+//
+//	tabs     ← → switch tab     ↓ buttons (or list)
+//	buttons  ← → move button    ↑ tabs   ↓ list   enter/space press
+//	list     ↑ ↓ move row       ↑ on the top row: buttons (or tabs)
+func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	rows := m.items[m.tabs[m.active]]
 
-		// f: next rate (2s → 5s → 10s → 2s). Restart the timer so it takes effect now.
-		case KeyRefreshRate:
-			m.refreshEvery = nextRate(m.refreshEvery)
-			m.tickGen++
-			if m.autoRefresh {
-				return m, m.startTimer()
-			}
+	switch msg.String() {
+	case KeyQuit, KeyCtrlC:
+		return m, tea.Quit
 
-		// tab: jump between the tab bar and the list
-		case KeyTab:
-			if m.focus == focusTabs {
-				m.focus = focusList
-			} else {
-				m.focus = focusTabs
-			}
+	// r: step the refresh rate from anywhere, same as pressing the button.
+	case KeyRefreshRate:
+		return m.stepRefresh()
 
-		// ← →: switch tabs (works from anywhere)
-		// Load the new tab right away instead of waiting for the next tick.
-		case KeyRight, KeyL:
-			m.active = (m.active + 1) % len(m.tabs)
-			m.cursor = 0
-			return m, m.loadActive()
-		case KeyShiftTab, KeyLeft, KeyH:
-			m.active = (m.active - 1 + len(m.tabs)) % len(m.tabs)
-			m.cursor = 0
-			return m, m.loadActive()
+	// tab: step the focus tabs → buttons → list → tabs.
+	case KeyTab:
+		switch m.focus {
+		case focusTabs:
+			m.focus = m.belowTabs()
+		case focusButtons:
+			m.focus = focusList
+		default:
+			m.focus = focusTabs
+		}
 
-		// ↓: from the tabs go into the list, in the list move down
-		case KeyDown, KeyJ:
-			if m.focus == focusTabs {
-				m.focus = focusList
-			} else if m.cursor < len(rows)-1 {
+	// enter / space: press the button the cursor is on.
+	case KeyEnter, KeySpace:
+		if m.focus == focusButtons {
+			return m.pressButton()
+		}
+
+	// → : next button on the buttons, otherwise next tab.
+	case KeyRight, KeyL:
+		if m.focus == focusButtons {
+			m.button = min(m.button+1, len(m.refreshButtons())-1)
+			return m, nil
+		}
+		return m.switchTab(+1)
+
+	// ← : previous button on the buttons, otherwise previous tab.
+	case KeyLeft, KeyH:
+		if m.focus == focusButtons {
+			m.button = max(m.button-1, 0)
+			return m, nil
+		}
+		return m.switchTab(-1)
+
+	// shift+tab: always the previous tab.
+	case KeyShiftTab:
+		return m.switchTab(-1)
+
+	// ↓ : tabs → buttons → list, then down the list.
+	case KeyDown, KeyJ:
+		switch m.focus {
+		case focusTabs:
+			m.focus = m.belowTabs()
+		case focusButtons:
+			m.focus = focusList
+		default:
+			if m.cursor < len(rows)-1 {
 				m.cursor++
-			}
-
-		// ↑: in the list move up, at the top row go back to the tabs
-		case KeyUp, KeyK:
-			if m.focus == focusList {
-				if m.cursor > 0 {
-					m.cursor--
-				} else {
-					m.focus = focusTabs
-				}
 			}
 		}
 
+	// ↑ : up the list; from its top row to the buttons, then to the tabs.
+	case KeyUp, KeyK:
+		switch m.focus {
+		case focusList:
+			if m.cursor > 0 {
+				m.cursor--
+			} else {
+				m.focus = m.aboveList()
+			}
+		case focusButtons:
+			m.focus = focusTabs
+		}
 	}
 	return m, nil
+}
+
+// switchTab moves to the tab step places along (wrapping), and loads it
+// right away instead of waiting for the next tick.
+func (m Model) switchTab(step int) (tea.Model, tea.Cmd) {
+	m.active = (m.active + step + len(m.tabs)) % len(m.tabs)
+	m.cursor = 0
+	return m, m.loadActive()
+}
+
+// pressButton does what the button the cursor is on does.
+func (m Model) pressButton() (tea.Model, tea.Cmd) {
+	buttons := m.refreshButtons()
+	if m.button < 0 || m.button >= len(buttons) {
+		return m, nil
+	}
+	switch buttons[m.button].name {
+	case buttonRefresh:
+		return m.stepRefresh()
+	}
+	return m, nil
+}
+
+// belowTabs is where the focus goes coming down from the tabs: the buttons
+// if they are shown, otherwise straight to the list.
+func (m Model) belowTabs() focus {
+	if m.buttonsShown() {
+		return focusButtons
+	}
+	return focusList
+}
+
+// aboveList is where the focus goes leaving the list upwards: the buttons if
+// they are shown, otherwise the tabs.
+func (m Model) aboveList() focus {
+	if m.buttonsShown() {
+		return focusButtons
+	}
+	return focusTabs
 }

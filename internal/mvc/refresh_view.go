@@ -10,83 +10,131 @@ import (
 
 // View code for the buttons set into the panel's top border:
 //
-//	┌─ refresh: on ─ every 5s ─ updated 14:30:05 ──────────────────┐
+//	┌─  refresh: 5s  ──────────────────────────────────────────────┐
 //
 // Only drawing lives here; the refresh logic (timer, rates, loading) is in refresh.go.
 
 // buttonGap is the number of border pieces (─) between two buttons.
 const buttonGap = 3
 
-// button is one label set into the panel's top border, e.g. "refresh: on".
+// Button names, so Update knows which button was pressed.
+const buttonRefresh = "refresh"
+
+// button is one label set into the panel's top border, e.g. "refresh: 5s".
 type button struct {
-	label string
-	on    bool // drawn in the accent colour when true, gray when false
+	name  string // one of the button names above
+	label string // the text on the button
+	on    bool   // green when true, dark gray when false
 }
 
-// Styles for the buttons on the top border.
+// Styles for the buttons on the top border (same look as systems-programing).
 var (
-	// buttonOn is a button that is active: filled, like the active tab.
+	// buttonOn is a button that is switched on: green.
 	buttonOn = lipgloss.NewStyle().
+			Padding(0, 2).
+			Bold(true).
 			Foreground(styles.OnAccent).
-			Background(styles.Accent).
-			Padding(0, 1)
+			Background(styles.On)
 
-	// buttonOff is a button that is not active; same padding so nothing shifts.
-	buttonOff = lipgloss.NewStyle().Foreground(styles.Muted).Padding(0, 1)
+	// buttonOff is a button that is switched off: dark gray, same padding so nothing shifts.
+	buttonOff = lipgloss.NewStyle().
+			Padding(0, 2).
+			Foreground(styles.OnAccent).
+			Background(styles.Off)
 
 	// borderLine draws border pieces in the panel's border colour.
 	borderLine = lipgloss.NewStyle().Foreground(styles.Accent)
 )
 
-// render draws the button in its on or off style.
-func (b button) render() string {
+// render draws the button. focused is whether the cursor is on it: then its
+// text is bold, white and underlined, like the focused tab.
+func (b button) render(focused bool) string {
+	s := buttonOff
 	if b.on {
-		return buttonOn.Render(b.label)
+		s = buttonOn
 	}
-	return buttonOff.Render(b.label)
+	if focused {
+		s = s.Bold(true).Foreground(styles.ColorWhite).Underline(true)
+	}
+	return s.Render(b.label)
 }
 
-// refreshButtons are the buttons on the panel's top border, left to right:
-//
-//	[refresh: on] [every 5s] [updated 14:30:05]
-//
-// "refresh" and the rate are filled while auto refresh runs, gray when it is
-// off. "updated" is left out until the active tab has loaded once.
+// refreshButtons are the buttons on the panel's top border: one refresh
+// button showing the rate, "refresh: 5s", or "refresh: off".
 func (m Model) refreshButtons() []button {
-	state := "off"
-	if m.autoRefresh {
-		state = "on"
+	if m.refreshEvery == refreshOff {
+		return []button{{name: buttonRefresh, label: "refresh: off"}}
 	}
-	buttons := []button{
-		{label: "refresh: " + state, on: m.autoRefresh},
-		{label: "every " + m.refreshEvery.String(), on: m.autoRefresh},
-	}
-	if at, ok := m.updated[m.tabs[m.active]]; ok {
-		buttons = append(buttons, button{label: "updated " + at.Format("15:04:05")})
-	}
-	return buttons
+	return []button{{name: buttonRefresh, label: "refresh: " + m.refreshEvery.String(), on: true}}
 }
 
-// withButtons redraws the first line of box, its top border, with the
-// buttons set into it:
-//
-//	┌─[refresh: on]─[every 5s]─[updated 14:30:05]────────────────┐
-//
-// width is the box's full width. If the buttons don't fit, box is returned
-// as it is, with a plain top border.
-func withButtons(box string, buttons []button, width int) string {
+// focusedButton is the index of the button the cursor is on, or -1 if the
+// cursor is somewhere else.
+func (m Model) focusedButton() int {
+	if m.focus != focusButtons {
+		return -1
+	}
+	return m.button
+}
+
+// buttonRow draws the buttons side by side, joined by pieces of border.
+// focused is the index of the button the cursor is on, or -1.
+func buttonRow(buttons []button, focused int) string {
 	parts := make([]string, len(buttons))
 	for i, b := range buttons {
-		parts[i] = b.render()
+		parts[i] = b.render(i == focused)
 	}
-	row := strings.Join(parts, borderLine.Render(strings.Repeat("─", buttonGap)))
+	return strings.Join(parts, borderLine.Render(strings.Repeat("─", buttonGap)))
+}
 
+// buttonsShown reports whether the buttons fit on the top border. The
+// corners and one piece of border on each side take 4 columns. When they
+// don't fit they are not drawn, and the cursor skips them.
+func (m Model) buttonsShown() bool {
+	return lipgloss.Width(buttonRow(m.refreshButtons(), -1)) <= m.width-4
+}
+
+// lastUpdated is the text for the right corner of the top border,
+// "updated 14:30:05": when the active tab last loaded. It is "" while
+// refresh is off, or before the tab has loaded once.
+func (m Model) lastUpdated() string {
+	if m.refreshEvery == refreshOff {
+		return ""
+	}
+	at, ok := m.updated[m.tabs[m.active]]
+	if !ok {
+		return ""
+	}
+	return "updated " + at.Format("15:04:05")
+}
+
+// withButtons redraws the first line of box, its top border, with row set
+// into it on the left and right (if not "") on the right:
+//
+//	┌─[refresh: 5s]─────────────────────────────── updated 14:30:05 ─┐
+//
+// width is the box's full width. If right doesn't fit next to row, it is
+// left out. If row doesn't fit either, box is returned as it is, with a
+// plain top border.
+func withButtons(box, row, right string, width int) string {
 	b := lipgloss.NormalBorder()
-	fill := width - 3 - lipgloss.Width(row) // 3 = "┌─" and "┐"
+
+	// The right corner: " updated 14:30:05 ─", in gray, before the "┐".
+	corner := ""
+	if right != "" {
+		corner = Help.Render(" "+right+" ") + borderLine.Render(b.Top)
+	}
+
+	fill := width - 3 - lipgloss.Width(row) - lipgloss.Width(corner) // 3 = "┌─" and "┐"
+	if fill < 1 && corner != "" {
+		corner = "" // no room for the time: keep just the buttons
+		fill = width - 3 - lipgloss.Width(row)
+	}
 	if fill < 1 {
 		return box
 	}
-	top := borderLine.Render(b.TopLeft+b.Top) + row + borderLine.Render(strings.Repeat(b.Top, fill)+b.TopRight)
+	top := borderLine.Render(b.TopLeft+b.Top) + row +
+		borderLine.Render(strings.Repeat(b.Top, fill)) + corner + borderLine.Render(b.TopRight)
 
 	_, rest, _ := strings.Cut(box, "\n")
 	return top + "\n" + rest

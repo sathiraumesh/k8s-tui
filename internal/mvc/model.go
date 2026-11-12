@@ -12,8 +12,9 @@ import (
 type focus int
 
 const (
-	focusTabs focus = iota // 0: cursor is on the tab bar
-	focusList              // 1: cursor is on the list in the panel
+	focusTabs    focus = iota // cursor is on the tab bar
+	focusButtons              // cursor is on the buttons in the panel's top border
+	focusList                 // cursor is on the list in the panel
 )
 
 // Model is everything the app remembers between key presses.
@@ -43,10 +44,14 @@ type Model struct {
 	width  int
 	height int
 
-	// focus is where the cursor is: the tab bar or the list.
-	// Starts as focusTabs (0). Changed by tab, ↓ from the tabs,
-	// and ↑ from the top row of the list.
+	// focus is where the cursor is: the tab bar, the buttons or the list.
+	// Starts as focusTabs. ↓ goes tabs → buttons → list, ↑ goes back up
+	// (from the list only at its top row), and tab steps through all three.
 	focus focus
+
+	// button is the index of the button the cursor is on, while focus is
+	// focusButtons. Changed by ← / →.
+	button int
 
 	// client talks to the cluster. nil in tests, so nothing is loaded there.
 	client *k8s.Client
@@ -54,12 +59,8 @@ type Model struct {
 	// err is the last error from the cluster, shown in the panel. nil when all is fine.
 	err error
 
-	// autoRefresh is true while the active tab reloads by itself (status line: "● on").
-	// Toggled by KeyAutoRefresh.
-	autoRefresh bool
-
 	// refreshEvery is how often the active tab reloads: one of refreshRates.
-	// Cycled by KeyRefreshRate.
+	// 0 means auto refresh is off. Stepped by the refresh button or KeyRefreshRate.
 	refreshEvery time.Duration
 
 	// tickGen is the generation of the running timer (see refreshTickMsg).
@@ -82,7 +83,6 @@ func New(client *k8s.Client) Model {
 			"Deployments": {"nginx", "api"},
 			"Services":    {"kubernetes", "nginx-svc", "redis"},
 		},
-		autoRefresh:  true,
 		refreshEvery: defaultRefresh,
 		updated:      map[string]time.Time{},
 	}

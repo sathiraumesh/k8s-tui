@@ -40,6 +40,10 @@ var (
 // tabGap is the number of empty columns between two tabs.
 const tabGap = 2
 
+// panelMarginY is the number of empty rows above the panel (below the tabs)
+// and below it (above the help line).
+const panelMarginY = 1
+
 func (m Model) View() string {
 	if m.width == 0 {
 		return "loading..."
@@ -63,9 +67,9 @@ func (m Model) View() string {
 	// Panel size: full width, full height minus the lines around it.
 	// Width/Height include padding but not the border or margin, so subtract those.
 	// If the total is taller than the terminal, the top lines (the tab bar) scroll off.
-	bodyH := m.height - 3 // tab bar + gap (Panel's MarginTop) + help line
-	panelW := m.width - 2 // left + right border
-	panelH := bodyH - 2   // top + bottom border
+	bodyH := m.height - 2 - 2*panelMarginY // tab bar + help line + margin above and below the panel
+	panelW := m.width - 2                  // left + right border
+	panelH := bodyH - 2                    // top + bottom border
 
 	// Single panel: list. Underline the selected row only when the cursor is on the list
 	rows := m.items[m.tabs[m.active]]
@@ -87,8 +91,16 @@ func (m Model) View() string {
 	}
 	body := Panel.Width(panelW).Height(panelH).Render(list.String())
 
-	// Set the refresh buttons into the panel's top border, right under the tabs.
-	body = withButtons(body, m.refreshButtons(), lipgloss.Width(body))
+	// Set the buttons into the panel's top border, right under the tabs.
+	// The one the cursor is on (if any) is underlined.
+	if m.buttonsShown() {
+		row := buttonRow(m.refreshButtons(), m.focusedButton())
+		body = withButtons(body, row, m.lastUpdated(), lipgloss.Width(body))
+	}
+
+	// Empty rows above and below the panel. Added after withButtons, which
+	// needs the panel's top border to be its first line.
+	body = lipgloss.NewStyle().MarginTop(panelMarginY).MarginBottom(panelMarginY).Render(body)
 
 	// MaxWidth cuts a line off at the terminal edge instead of wrapping it,
 	// so a narrow terminal never gets an extra line. Every one-line part uses it:
@@ -96,7 +108,7 @@ func (m Model) View() string {
 	fit := lipgloss.NewStyle().MaxWidth(m.width)
 
 	tabBar = fit.Render(tabBar)
-	footer := fit.Render(Help.Render("tab focus • ←→ tab • ↑↓ move • a auto • f rate • q quit"))
+	footer := fit.Render(Help.Render("tab focus • ←→ tab/button • ↑↓ move • enter press • r refresh • q quit"))
 
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
 }

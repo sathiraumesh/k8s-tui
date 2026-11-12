@@ -109,3 +109,107 @@ func TestViewManyRowsDoNotGrowScreen(t *testing.T) {
 		t.Errorf("height = %d, want 15", got)
 	}
 }
+
+// ---------- margins above and below the panel ----------
+
+// screenLines renders the view at w×h and returns its lines.
+func screenLines(t *testing.T, w, h int) []string {
+	t.Helper()
+	return strings.Split(sized(t, testModel(), w, h).View(), "\n")
+}
+
+// blank reports whether a line has nothing but spaces.
+func blank(line string) bool {
+	return strings.TrimSpace(line) == ""
+}
+
+// The screen is, top to bottom: tab bar, margin rows, panel, margin rows, help line.
+func TestViewLayoutOrder(t *testing.T) {
+	lines := screenLines(t, 80, 24)
+
+	if !strings.Contains(lines[0], "Nodes") {
+		t.Errorf("line 0 = %q, want the tab bar", lines[0])
+	}
+	for i := 1; i <= panelMarginY; i++ {
+		if !blank(lines[i]) {
+			t.Errorf("line %d = %q, want an empty margin row above the panel", i, lines[i])
+		}
+	}
+	if top := lines[1+panelMarginY]; !strings.HasPrefix(top, "┌") {
+		t.Errorf("line %d = %q, want the panel's top border", 1+panelMarginY, top)
+	}
+
+	last := len(lines) - 1
+	if bottom := lines[last-1-panelMarginY]; !strings.HasPrefix(bottom, "└") {
+		t.Errorf("line %d = %q, want the panel's bottom border", last-1-panelMarginY, bottom)
+	}
+	for i := last - panelMarginY; i < last; i++ {
+		if !blank(lines[i]) {
+			t.Errorf("line %d = %q, want an empty margin row below the panel", i, lines[i])
+		}
+	}
+	if !strings.Contains(lines[last], "q quit") {
+		t.Errorf("last line = %q, want the help line", lines[last])
+	}
+}
+
+// Exactly panelMarginY empty rows on each side: no more, no less.
+func TestViewMarginRowCount(t *testing.T) {
+	lines := screenLines(t, 80, 24)
+
+	above := 0
+	for i := 1; i < len(lines) && blank(lines[i]); i++ {
+		above++
+	}
+	below := 0
+	for i := len(lines) - 2; i >= 0 && blank(lines[i]); i-- {
+		below++
+	}
+	if above != panelMarginY || below != panelMarginY {
+		t.Errorf("empty rows above = %d, below = %d, want %d each", above, below, panelMarginY)
+	}
+}
+
+// The panel takes every row the tab bar, margins and help line leave over,
+// so the whole screen is exactly the terminal's height.
+func TestViewPanelFillsSpaceBetweenMargins(t *testing.T) {
+	for _, h := range []int{10, 15, 24, 40} {
+		t.Run(fmt.Sprintf("height %d", h), func(t *testing.T) {
+			lines := screenLines(t, 80, h)
+			if len(lines) != h {
+				t.Fatalf("screen has %d lines, want %d", len(lines), h)
+			}
+			top, bottom := 1+panelMarginY, h-2-panelMarginY
+			if !strings.HasPrefix(lines[top], "┌") || !strings.HasPrefix(lines[bottom], "└") {
+				t.Errorf("panel is not between rows %d and %d:\n%s", top, bottom, strings.Join(lines, "\n"))
+			}
+			if want := h - 2 - 2*panelMarginY; bottom-top+1 != want {
+				t.Errorf("panel is %d rows tall, want %d", bottom-top+1, want)
+			}
+		})
+	}
+}
+
+// The refresh button stays on the panel's top border, not on a margin row.
+func TestViewButtonNotOnMarginRow(t *testing.T) {
+	lines := screenLines(t, 80, 24)
+	for i := 1; i <= panelMarginY; i++ {
+		if strings.Contains(lines[i], "refresh") {
+			t.Errorf("margin row %d = %q has the refresh button, want it on the border", i, lines[i])
+		}
+	}
+	if !strings.Contains(lines[1+panelMarginY], "refresh: 5s") {
+		t.Errorf("top border %q is missing the refresh button", lines[1+panelMarginY])
+	}
+}
+
+// The margin rows are as wide as the rest of the screen, so nothing shifts.
+func TestViewMarginRowsFullWidth(t *testing.T) {
+	lines := screenLines(t, 80, 24)
+	last := len(lines) - 1
+	for _, i := range []int{1, last - 1} {
+		if w := lipgloss.Width(lines[i]); w != 80 {
+			t.Errorf("margin row %d is %d wide, want 80", i, w)
+		}
+	}
+}

@@ -8,21 +8,24 @@ const (
 	KeyQuit  = "q"
 	KeyCtrlC = "ctrl+c"
 
-	// Switch focus between the tab bar and the list
+	// Step focus: tab bar → buttons → list → tab bar
 	KeyTab = "tab"
 
-	// Auto refresh: turn it on/off, and cycle the rate 2s → 5s → 10s
-	KeyAutoRefresh = "a"
-	KeyRefreshRate = "f"
+	// Press the button the cursor is on
+	KeyEnter = "enter"
+	KeySpace = " "
 
-	// Next tab
+	// Step the refresh rate from anywhere: off → 2s → 5s → 10s → off
+	KeyRefreshRate = "r"
+
+	// Next tab (on the buttons: next button)
 	KeyRight = "right" // → arrow
 	KeyL     = "l"     // vim-style right
 
-	// Previous tab
-	KeyShiftTab = "shift+tab"
-	KeyLeft     = "left" // ← arrow
-	KeyH        = "h"    // vim-style left
+	// Previous tab (on the buttons: previous button)
+	KeyShiftTab = "shift+tab" // always the previous tab
+	KeyLeft     = "left"      // ← arrow
+	KeyH        = "h"         // vim-style left
 
 	// Move cursor down the list
 	KeyDown = "down" // ↓ arrow

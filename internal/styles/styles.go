@@ -14,6 +14,8 @@ const (
 	ColorGray       lipgloss.Color = "#9D9D9D" // secondary / description text
 	ColorSelection  lipgloss.Color = "#04395E" // selected row in lists (Explorer)
 	ColorBorder     lipgloss.Color = "#2B2B2B" // panel and tab borders
+	ColorGreen      lipgloss.Color = "#007A33" // a button that is switched on; dark enough for white text
+	ColorDark       lipgloss.Color = "#585858" // a button that is switched off
 
 	// Role names: styles use these instead of the raw colors,
 	// so the theme can be changed by editing just these lines.
@@ -23,4 +25,6 @@ const (
 	Shade    = ColorSelection  // background of the selected row
 	Text     = ColorForeground // normal text
 	Bg       = ColorBackground // screen background
+	On       = ColorGreen      // background of a button that is switched on
+	Off      = ColorDark       // background of a button that is switched off
 )

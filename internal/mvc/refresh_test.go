@@ -2,7 +2,6 @@ package mvc
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,7 +60,7 @@ func fastClient() Model {
 }
 
 func TestDefaultRefreshRate(t *testing.T) {
-	if got := New(nil).refreshEvery; got != 5*time.Second {
+	if got := New(nil).refreshEvery; got != refreshNormal {
 		t.Errorf("refreshEvery = %s, want 5s", got)
 	}
 }
@@ -126,68 +125,53 @@ func TestFailedLoadKeepsOldUpdateTime(t *testing.T) {
 	}
 }
 
-// ---------- a: auto refresh on / off ----------
+// ---------- r / the refresh button: off → 2s → 5s → 10s → off ----------
 
-func TestAutoRefreshStartsOn(t *testing.T) {
-	if !New(nil).autoRefresh {
-		t.Error("autoRefresh = false at start, want true")
+func TestRateCycles(t *testing.T) {
+	m := New(nil) // starts at 5s
+	for _, want := range []time.Duration{refreshSlow, refreshOff, refreshFast, refreshNormal} {
+		m = press(t, m, rateKey)
+		if m.refreshEvery != want {
+			t.Fatalf("refreshEvery = %s, want %s", m.refreshEvery, want)
+		}
 	}
 }
 
-func TestAutoRefreshTurnOff(t *testing.T) {
-	m, cmd := fastClient().Update(autoKey)
-	got := m.(Model)
-	if got.autoRefresh {
-		t.Error("autoRefresh = true after pressing a, want false")
+func TestTurningOffStopsTimer(t *testing.T) {
+	m := New(k8s.NewClientFromClientset(fake.NewClientset()))
+	m.refreshEvery = refreshSlow // the step before off
+	next, cmd := m.Update(rateKey)
+	if next.(Model).refreshEvery != 0 {
+		t.Fatalf("refreshEvery = %s, want off (0)", next.(Model).refreshEvery)
 	}
 	if cmd != nil {
 		t.Error("turning off returned a command, want none (no load, no timer)")
 	}
 }
 
-func TestAutoRefreshTurnBackOnLoadsAndStartsTimer(t *testing.T) {
-	m := press(t, fastClient(), autoKey) // off
-	next, cmd := m.Update(autoKey)       // on again
-	if !next.(Model).autoRefresh {
-		t.Fatal("autoRefresh = false after pressing a twice, want true")
-	}
-	msgs := runBatch(t, cmd)
-	if !hasLoaded(msgs, "Nodes") {
-		t.Errorf("turning on sent %#v, want an immediate reload", msgs)
-	}
-	if !hasTick(msgs) {
-		t.Errorf("turning on sent %#v, want the timer started", msgs)
-	}
-}
-
 func TestTickIgnoredWhenOff(t *testing.T) {
-	m := press(t, fastClient(), autoKey) // off
+	m := New(nil)
+	m.refreshEvery = refreshOff
 	if _, cmd := m.Update(refreshTickMsg{gen: m.tickGen}); cmd != nil {
 		t.Error("a tick while off returned a command, want the timer to stop")
 	}
 }
 
-// A tick from the timer that was running before a toggle or rate change is
-// dropped, so two timers never run at once.
-func TestOldTickIgnored(t *testing.T) {
-	m := press(t, fastClient(), autoKey, autoKey) // off, on: new timer
-	if _, cmd := m.Update(refreshTickMsg{gen: m.tickGen - 1}); cmd != nil {
-		t.Error("a tick from the old timer returned a command, want it dropped")
+// Turning on from off reloads straight away and starts the timer.
+// (Only the load is run here: running the timer would wait 2s.)
+func TestTurningOnLoadsAndStartsTimer(t *testing.T) {
+	m := fastClient()
+	m.refreshEvery = refreshOff // off
+	next, cmd := m.Update(rateKey)
+	if got := next.(Model).refreshEvery; got != refreshFast {
+		t.Fatalf("refreshEvery = %s, want 2s", got)
 	}
-	if _, cmd := m.Update(refreshTickMsg{gen: m.tickGen}); cmd == nil {
-		t.Error("a tick from the current timer returned nothing, want reload + next tick")
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Fatalf("turning on sent %#v, want a batch of load + timer", cmd())
 	}
-}
-
-// ---------- f: rate 2s / 5s / 10s ----------
-
-func TestRateCycles(t *testing.T) {
-	m := New(nil)
-	for _, want := range []time.Duration{10 * time.Second, 2 * time.Second, 5 * time.Second} {
-		m = press(t, m, rateKey)
-		if m.refreshEvery != want {
-			t.Fatalf("refreshEvery = %s, want %s", m.refreshEvery, want)
-		}
+	if msg, ok := batch[0]().(itemsLoadedMsg); !ok || msg.tab != "Nodes" {
+		t.Errorf("first command sent %#v, want a reload of Nodes", msg)
 	}
 }
 
@@ -202,93 +186,60 @@ func TestRateChangeRestartsTimer(t *testing.T) {
 	}
 }
 
-func TestRateChangeWhileOffStartsNoTimer(t *testing.T) {
-	m := press(t, fastClient(), autoKey) // off
-	next, cmd := m.Update(rateKey)
-	if cmd != nil {
-		t.Error("changing the rate while off returned a command, want none")
+// A tick from the timer that was running before a rate change is dropped,
+// so two timers never run at once.
+func TestOldTickIgnored(t *testing.T) {
+	m := press(t, New(k8s.NewClientFromClientset(fake.NewClientset())), rateKey) // 5s → 10s: new timer
+	if _, cmd := m.Update(refreshTickMsg{gen: m.tickGen - 1}); cmd != nil {
+		t.Error("a tick from the old timer returned a command, want it dropped")
 	}
-	if next.(Model).refreshEvery == m.refreshEvery {
-		t.Error("rate did not change while off; it should still be changeable")
-	}
-}
-
-// ---------- buttons on the panel's top border ----------
-
-// labels returns the buttons' labels, for comparing in tests.
-func labels(buttons []button) []string {
-	var out []string
-	for _, b := range buttons {
-		out = append(out, b.label)
-	}
-	return out
-}
-
-func TestRefreshButtonsOn(t *testing.T) {
-	buttons := New(nil).refreshButtons()
-	if got, want := labels(buttons), []string{"refresh: on", "every 5s"}; !slices.Equal(got, want) {
-		t.Errorf("labels = %q, want %q", got, want)
-	}
-	for _, b := range buttons {
-		if !b.on {
-			t.Errorf("button %q is off, want on while auto refresh runs", b.label)
-		}
+	if _, cmd := m.Update(refreshTickMsg{gen: m.tickGen}); cmd == nil {
+		t.Error("a tick from the current timer returned nothing, want the next tick")
 	}
 }
 
-func TestRefreshButtonsOff(t *testing.T) {
-	buttons := press(t, New(nil), autoKey).refreshButtons()
-	if got, want := labels(buttons), []string{"refresh: off", "every 5s"}; !slices.Equal(got, want) {
-		t.Errorf("labels = %q, want %q", got, want)
-	}
-	for _, b := range buttons {
-		if b.on {
-			t.Errorf("button %q is on, want off (gray) while auto refresh is off", b.label)
-		}
+// ---------- the refresh button on the panel's top border ----------
+
+func TestRefreshButtonOn(t *testing.T) {
+	b := New(nil).refreshButtons()
+	if len(b) != 1 || b[0].label != "refresh: 5s" || !b[0].on || b[0].name != buttonRefresh {
+		t.Errorf("buttons = %+v, want one green refresh button \"refresh: 5s\"", b)
 	}
 }
 
-func TestRefreshButtonsShowRate(t *testing.T) {
-	buttons := press(t, New(nil), rateKey).refreshButtons() // 5s → 10s
-	if got := buttons[1].label; got != "every 10s" {
-		t.Errorf("rate button = %q, want every 10s", got)
+func TestRefreshButtonOff(t *testing.T) {
+	m := New(nil)
+	m.refreshEvery = refreshOff
+	b := m.refreshButtons()
+	if len(b) != 1 || b[0].label != "refresh: off" || b[0].on {
+		t.Errorf("buttons = %+v, want one gray refresh button \"refresh: off\"", b)
 	}
 }
 
-func TestRefreshButtonsUpdatedTime(t *testing.T) {
-	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
-	m := press(t, New(nil), itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at})
-	if got := labels(m.refreshButtons()); !slices.Contains(got, "updated 14:30:05") {
-		t.Errorf("labels = %q, want updated 14:30:05", got)
-	}
-
-	// "updated" belongs to the active tab: Pods has never loaded.
-	m.active = 1
-	for _, l := range labels(m.refreshButtons()) {
-		if strings.HasPrefix(l, "updated") {
-			t.Errorf("on Pods: labels show %q, want no updated time", l)
-		}
+func TestRefreshButtonShowsNewRate(t *testing.T) {
+	b := press(t, New(nil), rateKey).refreshButtons() // 5s → 10s
+	if b[0].label != "refresh: 10s" {
+		t.Errorf("label = %q, want refresh: 10s", b[0].label)
 	}
 }
 
-// The buttons sit in the panel's top border: the line right under the tabs.
-func TestViewButtonsOnPanelTopBorder(t *testing.T) {
+// The button sits in the panel's top border: the line right under the tabs.
+func TestViewButtonOnPanelTopBorder(t *testing.T) {
 	lines := strings.Split(sized(t, New(nil), 80, 24).View(), "\n")
-	top := lines[1]
+	top := lines[1+panelMarginY] // after the tab bar and the empty margin rows
 	if !strings.HasPrefix(top, "┌─") || !strings.HasSuffix(strings.TrimRight(top, " "), "┐") {
-		t.Errorf("line under the tabs %q, want the panel's top border", top)
+		t.Errorf("line under the tabs and margin %q, want the panel's top border", top)
 	}
-	for _, want := range []string{"refresh: on", "every 5s"} {
-		if !strings.Contains(top, want) {
-			t.Errorf("top border %q is missing %q", top, want)
-		}
+	if !strings.Contains(top, "refresh: 5s") {
+		t.Errorf("top border %q is missing refresh: 5s", top)
 	}
 }
 
 // The top border with buttons is exactly as wide as the rest of the box.
 func TestWithButtonsKeepsWidth(t *testing.T) {
 	box := Panel.Width(40).Height(3).Render("x")
-	got := withButtons(box, []button{{label: "refresh: on", on: true}, {label: "every 5s"}}, lipgloss.Width(box))
+	row := buttonRow([]button{{label: "refresh: 5s", on: true}}, -1)
+	got := withButtons(box, row, "", lipgloss.Width(box))
 	lines := strings.Split(got, "\n")
 	for i, line := range lines {
 		if w := lipgloss.Width(line); w != lipgloss.Width(box) {
@@ -303,9 +254,96 @@ func TestWithButtonsKeepsWidth(t *testing.T) {
 // When the buttons don't fit, the box keeps a plain top border.
 func TestWithButtonsTooNarrow(t *testing.T) {
 	box := Panel.Width(10).Height(1).Render("x")
-	got := withButtons(box, []button{{label: "refresh: on", on: true}}, lipgloss.Width(box))
-	if got != box {
+	row := buttonRow([]button{{label: "refresh: 5s", on: true}}, -1)
+	if got := withButtons(box, row, "", lipgloss.Width(box)); got != box {
 		t.Errorf("box changed though the buttons don't fit:\n%s", got)
+	}
+}
+
+// ---------- focus on the buttons ----------
+
+// onScreen is testModel with a terminal size, so the buttons are shown.
+func onScreen(t *testing.T) Model {
+	return sized(t, testModel(), 80, 24)
+}
+
+func TestFocusDownGoesTabsButtonsList(t *testing.T) {
+	m := press(t, onScreen(t), down)
+	if m.focus != focusButtons {
+		t.Fatalf("after ↓ from tabs: focus = %d, want buttons", m.focus)
+	}
+	m = press(t, m, down)
+	if m.focus != focusList || m.cursor != 0 {
+		t.Fatalf("after ↓ from buttons: focus = %d cursor = %d, want list row 0", m.focus, m.cursor)
+	}
+}
+
+func TestFocusUpGoesListButtonsTabs(t *testing.T) {
+	m := press(t, onScreen(t), down, down) // on the list, row 0
+	m = press(t, m, up)
+	if m.focus != focusButtons {
+		t.Fatalf("after ↑ from the top row: focus = %d, want buttons", m.focus)
+	}
+	m = press(t, m, up)
+	if m.focus != focusTabs {
+		t.Fatalf("after ↑ from buttons: focus = %d, want tabs", m.focus)
+	}
+}
+
+func TestTabKeyStepsThroughButtons(t *testing.T) {
+	m := onScreen(t)
+	for _, want := range []focus{focusButtons, focusList, focusTabs} {
+		m = press(t, m, tab)
+		if m.focus != want {
+			t.Fatalf("focus = %d, want %d", m.focus, want)
+		}
+	}
+}
+
+// On the buttons ← → move between buttons, they don't switch tabs.
+func TestArrowsOnButtonsDontSwitchTab(t *testing.T) {
+	m := press(t, onScreen(t), down, right, left)
+	if m.active != 0 {
+		t.Errorf("active tab = %d, want 0 (unchanged)", m.active)
+	}
+	if m.button != 0 {
+		t.Errorf("button = %d, want 0 (there is only one)", m.button)
+	}
+}
+
+func TestEnterAndSpacePressRefreshButton(t *testing.T) {
+	for _, key := range []tea.KeyMsg{enterKey, spaceKey} {
+		t.Run(key.String(), func(t *testing.T) {
+			m := press(t, onScreen(t), down, key) // focus buttons, press
+			if m.refreshEvery != refreshSlow {
+				t.Errorf("refreshEvery = %s, want 10s after pressing the button", m.refreshEvery)
+			}
+		})
+	}
+}
+
+func TestEnterElsewhereDoesNothing(t *testing.T) {
+	m := press(t, onScreen(t), enterKey) // focus on tabs
+	if m.refreshEvery != refreshNormal {
+		t.Errorf("refreshEvery = %s, want 5s (unchanged)", m.refreshEvery)
+	}
+}
+
+func TestFocusedButton(t *testing.T) {
+	m := onScreen(t)
+	if got := m.focusedButton(); got != -1 {
+		t.Errorf("on tabs: focusedButton = %d, want -1", got)
+	}
+	if got := press(t, m, down).focusedButton(); got != 0 {
+		t.Errorf("on buttons: focusedButton = %d, want 0", got)
+	}
+}
+
+// When the buttons don't fit, the cursor skips them.
+func TestFocusSkipsHiddenButtons(t *testing.T) {
+	m := press(t, sized(t, testModel(), 12, 24), down)
+	if m.focus != focusList {
+		t.Errorf("focus = %d, want list (buttons are hidden at 12 columns)", m.focus)
 	}
 }
 
@@ -339,8 +377,105 @@ func TestCursorKeptWhenOtherTabLoads(t *testing.T) {
 // errTest is a fixed error for tests.
 var errTest = errors.New("test error")
 
-// Key presses for auto refresh.
+// Key presses for the refresh button.
 var (
-	autoKey = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(KeyAutoRefresh)}
-	rateKey = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(KeyRefreshRate)}
+	rateKey  = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(KeyRefreshRate)}
+	enterKey = tea.KeyMsg{Type: tea.KeyEnter}
+	spaceKey = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")}
 )
+
+// ---------- last update time in the top border's right corner ----------
+
+// loadedAt is a model whose Nodes tab loaded at 14:30:05, on an 80×24 screen.
+func loadedAt(t *testing.T) Model {
+	t.Helper()
+	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
+	return press(t, onScreen(t), itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at})
+}
+
+// topBorder is the panel's top border line of the rendered screen.
+func topBorder(t *testing.T, m Model) string {
+	t.Helper()
+	return strings.Split(m.View(), "\n")[1+panelMarginY]
+}
+
+func TestLastUpdated(t *testing.T) {
+	if got := loadedAt(t).lastUpdated(); got != "updated 14:30:05" {
+		t.Errorf("lastUpdated = %q, want %q", got, "updated 14:30:05")
+	}
+}
+
+func TestLastUpdatedEmptyBeforeFirstLoad(t *testing.T) {
+	if got := onScreen(t).lastUpdated(); got != "" {
+		t.Errorf("lastUpdated = %q, want empty before the first load", got)
+	}
+}
+
+func TestLastUpdatedEmptyWhenOff(t *testing.T) {
+	m := loadedAt(t)
+	m.refreshEvery = refreshOff
+	if got := m.lastUpdated(); got != "" {
+		t.Errorf("lastUpdated = %q, want empty while refresh is off", got)
+	}
+}
+
+// The time belongs to the active tab: Pods has never loaded.
+func TestLastUpdatedIsForActiveTab(t *testing.T) {
+	m := loadedAt(t)
+	m.active = 1
+	if got := m.lastUpdated(); got != "" {
+		t.Errorf("on Pods: lastUpdated = %q, want empty", got)
+	}
+}
+
+// The time is at the right end of the top border: "updated 14:30:05 ─┐".
+func TestViewShowsUpdatedInRightCorner(t *testing.T) {
+	top := strings.TrimRight(topBorder(t, loadedAt(t)), " ")
+	if !strings.HasSuffix(top, "updated 14:30:05 ─┐") {
+		t.Errorf("top border %q, want it to end with \"updated 14:30:05 ─┐\"", top)
+	}
+	// The refresh button is still on the left.
+	if !strings.HasPrefix(top, "┌─") || !strings.Contains(top, "refresh: 5s") {
+		t.Errorf("top border %q, want the refresh button on the left", top)
+	}
+	if strings.Index(top, "refresh") > strings.Index(top, "updated") {
+		t.Errorf("top border %q, want refresh left of updated", top)
+	}
+}
+
+func TestViewHidesUpdatedWhenOff(t *testing.T) {
+	m := press(t, loadedAt(t), rateKey, rateKey) // 5s → 10s → off
+	if top := topBorder(t, m); strings.Contains(top, "updated") {
+		t.Errorf("top border %q shows the time while refresh is off", top)
+	}
+}
+
+// The top border with the time is exactly as wide as the rest of the box.
+func TestWithButtonsAndTimeKeepsWidth(t *testing.T) {
+	box := Panel.Width(60).Height(3).Render("x")
+	row := buttonRow([]button{{label: "refresh: 5s", on: true}}, -1)
+	got := withButtons(box, row, "updated 14:30:05", lipgloss.Width(box))
+	for i, line := range strings.Split(got, "\n") {
+		if w := lipgloss.Width(line); w != lipgloss.Width(box) {
+			t.Errorf("line %d is %d wide, want %d: %q", i, w, lipgloss.Width(box), line)
+		}
+	}
+}
+
+// When there is room for the button but not the time, the time is dropped
+// and the button stays.
+func TestWithButtonsDropsTimeWhenNarrow(t *testing.T) {
+	row := buttonRow([]button{{label: "refresh: 5s", on: true}}, -1)
+	box := Panel.Width(lipgloss.Width(row) + 4).Height(1).Render("x") // room for the button only
+	got := withButtons(box, row, "updated 14:30:05", lipgloss.Width(box))
+	top := strings.Split(got, "\n")[0]
+	if strings.Contains(top, "updated") {
+		t.Errorf("top border %q has the time though it doesn't fit", top)
+	}
+	if !strings.Contains(top, "refresh: 5s") {
+		t.Errorf("top border %q lost the button", top)
+	}
+	if lipgloss.Width(top) != lipgloss.Width(box) {
+		t.Errorf("top border is %d wide, want %d", lipgloss.Width(top), lipgloss.Width(box))
+	}
+}
