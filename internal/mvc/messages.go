@@ -56,5 +56,8 @@ type actionDoneMsg struct {
 	text    string // what a read action returned (the Describe text), or what a dry run would change
 	changed bool   // it was a change: the tab is reloaded to show it
 	dryRun  bool   // it was a change run with --dry-run=server: nothing was saved
-	shell   bool   // it was a shell (kubectl in the terminal) that has now closed
+	// terminal is whether it ran kubectl in the terminal (a shell, an
+	// editor) that has now closed, and closed what to say then.
+	terminal bool
+	closed   string
 }

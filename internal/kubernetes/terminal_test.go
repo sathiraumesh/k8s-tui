@@ -58,3 +58,27 @@ func TestNodeShellWithoutKubectl(t *testing.T) {
 		t.Error("err = nil, want kubectl not found")
 	}
 }
+
+func TestEditNode(t *testing.T) {
+	pretendKubectl(t, "/bin/kubectl")
+	c := NewClientFromClientset(fake.NewClientset())
+	c.context = "lab"
+	cmd, err := c.EditNode("worker1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"/bin/kubectl", "edit", "node", "worker1", "--context=lab"}
+	if !slices.Equal(cmd.Args, want) {
+		t.Errorf("command = %v, want %v", cmd.Args, want)
+	}
+	if got := EditNodeArgs("worker1", ""); !slices.Equal(got, []string{"edit", "node", "worker1"}) {
+		t.Errorf("without a context: %v", got)
+	}
+}
+
+func TestEditNodeWithoutKubectl(t *testing.T) {
+	pretendKubectl(t, "")
+	if _, err := NewClientFromClientset(fake.NewClientset()).EditNode("worker1"); err == nil {
+		t.Error("err = nil, want kubectl not found")
+	}
+}

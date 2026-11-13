@@ -24,8 +24,8 @@ import (
 //	                         a change: back to the list, reloaded ◀┤
 //	                         a dry run: what it would change      ◀┤
 //	                         a read: a page of text (Describe)    ◀┤
-//	                         a shell: kubectl has the terminal,
-//	                                  back to the list when it ends ◀┘
+//	                         a shell or an editor: kubectl has the
+//	                                  terminal, back to the list when it ends ◀┘
 //
 // How the pages are drawn is in actions_view.go.
 
@@ -156,21 +156,34 @@ func change(name, target string, flags []flag, do func(context.Context) (string,
 }
 
 // inTerminal returns the command for an action that needs the terminal to
-// itself, such as a shell: the app steps aside while cmd runs and comes
-// back when it ends. err is from making cmd, e.g. kubectl isn't installed.
-func inTerminal(name, target string, cmd *exec.Cmd, err error) tea.Cmd {
-	if err != nil {
-		return func() tea.Msg { return actionDoneMsg{action: name, target: target, shell: true, err: err} }
+// itself, such as a shell or an editor: the app steps aside while cmd runs
+// and comes back when it ends. err is from making cmd, e.g. kubectl isn't
+// installed. closed is what the line under the panel says afterwards.
+//
+// shell says cmd is a shell: it ends with the code of the last thing typed
+// in it, which isn't a failure of the shell, so only failing to start is.
+// Anything else that ends with an error code has failed.
+func inTerminal(name, target, closed string, shell bool, cmd *exec.Cmd, err error) tea.Cmd {
+	done := func(err error) tea.Msg {
+		return actionDoneMsg{action: name, target: target, terminal: true, closed: closed, err: err}
 	}
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		// A shell ends with the code of the last thing typed in it, which
-		// isn't a failure of the shell: only failing to start is.
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			err = nil
-		}
-		return actionDoneMsg{action: name, target: target, shell: true, err: err}
-	})
+	if err != nil {
+		return func() tea.Msg { return done(err) }
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg { return done(terminalError(shell, err)) })
+}
+
+// terminalError is how a command run in the terminal ended, as inTerminal
+// reports it: nil for a shell's exit code, an error for anything else's.
+func terminalError(shell bool, err error) error {
+	var exit *exec.ExitError
+	switch {
+	case !errors.As(err, &exit):
+		return err // nil, or it couldn't start
+	case shell:
+		return nil
+	}
+	return fmt.Errorf("kubectl ended with an error (%w)", err)
 }
 
 // changeText shows what a change does to a list, e.g. a node's labels:
@@ -309,9 +322,9 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	case msg.err != nil:
 		m.notice = what + " failed: " + msg.err.Error()
 		return m, nil
-	case msg.shell:
-		// Like kubectl, the debug pod is left behind.
-		m.notice = msg.action + " on " + msg.target + " closed; its debug pod is still there, delete it when you are done"
+	case msg.terminal:
+		m = m.closeOverlay() // an action that only reads, like Edit, ran from the action list
+		m.notice = msg.closed
 		return m, m.loadActive()
 	case msg.changed && msg.dryRun:
 		m.notice = what + ": dry run passed, nothing changed"

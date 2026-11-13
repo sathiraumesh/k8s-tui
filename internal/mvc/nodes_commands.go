@@ -134,7 +134,17 @@ func nodeActions() []action {
 					image = k8s.ShellImageUbuntu
 				}
 				cmd, err := c.NodeShell(target, image, ticked(flags, flagSysadmin))
-				return inTerminal("Shell", target, cmd, err)
+				// Like kubectl, the debug pod is left behind.
+				closed := "Shell on " + target + " closed; its debug pod is still there, delete it when you are done"
+				return inTerminal("Shell", target, closed, true, cmd, err)
+			},
+		},
+		{
+			key: "e", name: "Edit", about: "the node's YAML in your editor ($KUBE_EDITOR, $EDITOR or vi); saving applies it",
+			command: "kubectl edit node %s",
+			run: func(c *k8s.Client, target, _ string, _ []flag) tea.Cmd {
+				cmd, err := c.EditNode(target)
+				return inTerminal("Edit", target, "Edit "+target+": editor closed", false, cmd, err)
 			},
 		},
 		{

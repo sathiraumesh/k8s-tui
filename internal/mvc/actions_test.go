@@ -3,6 +3,7 @@ package mvc
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -594,20 +595,58 @@ func TestShellNeedsYes(t *testing.T) {
 // left; the list reloads.
 func TestShellClosed(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	next, cmd := m.Update(actionDoneMsg{action: "Shell", target: "worker2", shell: true})
+	next, cmd := m.Update(actionDoneMsg{action: "Shell", target: "worker2", terminal: true, closed: "Shell on worker2 closed; its debug pod is still there, delete it when you are done"})
 	if m = next.(Model); !strings.HasPrefix(m.notice, "Shell on worker2 closed") || cmd == nil {
 		t.Errorf("notice = %q, reload = %v", m.notice, cmd != nil)
 	}
-	next, _ = m.Update(actionDoneMsg{action: "Shell", target: "worker2", shell: true, err: errors.New("kubectl not found")})
+	next, _ = m.Update(actionDoneMsg{action: "Shell", target: "worker2", terminal: true, err: errors.New("kubectl not found")})
 	if m = next.(Model); !strings.Contains(m.notice, "failed: kubectl not found") {
 		t.Errorf("notice = %q", m.notice)
 	}
 }
 
-// A shell that ends with an exit code (the last command's) isn't a failure.
-func TestInTerminalIgnoresExitCode(t *testing.T) {
-	cmd := inTerminal("Shell", "worker2", nil, errors.New("kubectl not found"))
-	if msg := cmd().(actionDoneMsg); msg.err == nil || !msg.shell {
+// Not finding kubectl is reported, for a shell too.
+func TestInTerminalNoKubectl(t *testing.T) {
+	cmd := inTerminal("Shell", "worker2", "", true, nil, errors.New("kubectl not found"))
+	if msg := cmd().(actionDoneMsg); msg.err == nil || !msg.terminal {
 		t.Errorf("msg = %+v, want the error", msg)
+	}
+}
+
+// ---------- Edit ----------
+
+// e opens the editor straight away: there is nothing to tick, and nothing
+// changes unless the file is saved.
+func TestEditRunsAtOnce(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("e"))
+	if m.overlay != overlayActions || !strings.HasPrefix(m.notice, "running: kubectl edit node worker2") {
+		t.Errorf("overlay = %d, notice = %q", m.overlay, m.notice)
+	}
+}
+
+// When the editor closes, the app is back on the list, reloaded.
+func TestEditClosed(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("e"))
+	next, reload := m.Update(actionDoneMsg{action: "Edit", target: "worker2", terminal: true, closed: "Edit worker2: editor closed"})
+	if m = next.(Model); m.overlay != overlayNone || m.notice != "Edit worker2: editor closed" || reload == nil {
+		t.Errorf("overlay = %d, notice = %q, reload = %v", m.overlay, m.notice, reload != nil)
+	}
+}
+
+// Running kubectl: a shell's exit code isn't a failure, an editor's is.
+func TestInTerminalExitCode(t *testing.T) {
+	exitErr := exec.Command("false").Run() // an *exec.ExitError
+	for _, tc := range []struct {
+		shell   bool
+		wantErr bool
+	}{{true, false}, {false, true}} {
+		if err := terminalError(tc.shell, exitErr); (err != nil) != tc.wantErr {
+			t.Errorf("shell = %v: err = %v, want error %v", tc.shell, err, tc.wantErr)
+		}
+	}
+	if terminalError(false, nil) != nil {
+		t.Error("a clean exit is an error")
 	}
 }
