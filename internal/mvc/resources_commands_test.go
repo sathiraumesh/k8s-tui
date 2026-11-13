@@ -192,11 +192,11 @@ func TestWideOnMoreReloads(t *testing.T) {
 	}
 }
 
-// More has only the wide button: no refresh rate.
+// More has wide and search: no refresh rate.
 func TestMoreHasNoRefreshButton(t *testing.T) {
 	buttons := onMore(t, New(nil)).panelButtons()
-	if len(buttons) != 1 || buttons[0].name != buttonWide {
-		t.Errorf("buttons = %+v, want only wide", buttons)
+	if len(buttons) != 2 || buttons[0].name != buttonWide || buttons[1].name != buttonSearch {
+		t.Errorf("buttons = %+v, want wide and search", buttons)
 	}
 }
 
@@ -204,11 +204,11 @@ func TestMoreHasNoRefreshButton(t *testing.T) {
 func TestButtonCursorKeptOnSwitchToMore(t *testing.T) {
 	m := onScreen(t)
 	m.active = moreIndex(t, m) - 1
-	m = press(t, m, down, right) // on the refresh button (index 1)
-	m.focus = focusList          // so → switches tab
-	m = press(t, m, right)       // to More: only one button
-	if m.button != 0 {
-		t.Errorf("button = %d on More, want 0 (its only button)", m.button)
+	m = press(t, m, down, right, right) // on the search button (index 2)
+	m.focus = focusList                 // so → switches tab
+	m = press(t, m, right)              // to More: two buttons
+	if m.button != 1 {
+		t.Errorf("button = %d on More, want 1 (its last button)", m.button)
 	}
 }
 

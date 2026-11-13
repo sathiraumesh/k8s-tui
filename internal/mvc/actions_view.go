@@ -41,9 +41,12 @@ func (m Model) content() panelContent {
 		return panelContent{rows: m.text, cursor: -1, offset: m.textOffset}
 	}
 
-	rows := m.items[m.activeName()]
 	if m.err != nil {
-		rows = []string{"error: " + m.err.Error()}
+		return panelContent{rows: []string{"error: " + m.err.Error()}, cursor: m.cursor}
+	}
+	rows := m.rows()
+	if len(rows) == 0 && m.searchText() != "" {
+		return panelContent{rows: []string{"nothing matches \"" + m.searchText() + "\""}, cursor: -1}
 	}
 	return panelContent{rows: rows, cursor: m.cursor, offset: m.offset}
 }
@@ -126,6 +129,9 @@ func (m Model) overlayTitle() string {
 func (m Model) helpText() string {
 	if m.notice != "" {
 		return m.notice
+	}
+	if m.searching {
+		return "type to search • backspace delete • enter/↓ done • esc clear"
 	}
 	switch m.overlay {
 	case overlayActions:

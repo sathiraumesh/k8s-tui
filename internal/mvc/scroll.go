@@ -9,10 +9,11 @@ package mvc
 //	                   ▲ cursor = 5
 
 // listHeight is how many rows of the list fit in the panel: the terminal's
-// height minus the tab bar, the help line, the margins and the panel's top
-// and bottom border. It is at least 1.
+// height minus the tab bar, the help line, the margins, the panel's top
+// and bottom border, and the empty row under the top border. It is at
+// least 1.
 func (m Model) listHeight() int {
-	return max(m.height-2-2*panelMarginY-2, 1)
+	return max(m.height-2-2*panelMarginY-2-panelPaddingTop, 1)
 }
 
 // keepCursorVisible moves the offset as little as possible so the cursor's
@@ -20,7 +21,7 @@ func (m Model) listHeight() int {
 // list (no empty rows at the bottom while there are rows above).
 func (m Model) keepCursorVisible() Model {
 	h := m.listHeight()
-	total := len(m.items[m.activeName()])
+	total := len(m.rows())
 
 	if m.cursor < m.offset {
 		m.offset = m.cursor // cursor went above the top: scroll up to it
@@ -35,7 +36,7 @@ func (m Model) keepCursorVisible() Model {
 // moveCursor moves the list's cursor by step rows (negative is up), stopping
 // at the first and last row, and scrolls so it stays on screen.
 func (m Model) moveCursor(step int) Model {
-	last := len(m.items[m.activeName()]) - 1
+	last := len(m.rows()) - 1
 	m.cursor = max(min(m.cursor+step, last), 0)
 	return m.keepCursorVisible()
 }

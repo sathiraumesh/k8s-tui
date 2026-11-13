@@ -110,6 +110,12 @@ type Model struct {
 	// and splashFrame how many pictures of its animation were shown (splash.go).
 	splash      bool
 	splashFrame int
+
+	// search is what each tab's list is searched for, keyed by tab name;
+	// a missing entry is no search. searching is whether it is being typed
+	// (search.go).
+	search    map[string]string
+	searching bool
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each
@@ -128,6 +134,7 @@ func New(client *k8s.Client) Model {
 		refreshEvery: defaultRefresh,
 		updated:      map[string]time.Time{},
 		wide:         map[string]bool{},
+		search:       map[string]string{},
 	}
 }
 

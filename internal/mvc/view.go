@@ -44,6 +44,10 @@ const tabGap = 2
 // and below it (above the help line).
 const panelMarginY = 1
 
+// panelPaddingTop is the number of empty rows inside the panel between its
+// top border (the secondary bar) and the first row.
+const panelPaddingTop = 1
+
 func (m Model) View() string {
 	if m.width == 0 {
 		return "loading..."
@@ -97,7 +101,8 @@ func (m Model) View() string {
 		}
 		lines = append(lines, line)
 	}
-	body := Panel.Width(panelW).Height(panelH).Render(strings.Join(lines, "\n"))
+	// Height includes the padding, so the empty row on top is added to it.
+	body := Panel.PaddingTop(panelPaddingTop).Width(panelW).Height(panelH + panelPaddingTop).Render(strings.Join(lines, "\n"))
 
 	// The bottom border: the kubectl command behind the list, and "4-9 of 30"
 	// while the list is longer than the panel.

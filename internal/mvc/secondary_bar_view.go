@@ -22,7 +22,11 @@ const buttonGap = 3
 const (
 	buttonWide    = "wide"
 	buttonRefresh = "refresh"
+	buttonSearch  = "search"
 )
+
+// searchLabelWidth is the most of the search its button shows.
+const searchLabelWidth = 16
 
 // button is one label set into the panel's top border, e.g. "refresh: 5s".
 type button struct {
@@ -66,27 +70,51 @@ func (b button) render(focused bool) string {
 // panelButtons are the buttons on the panel's top border, left to right
 // (same order as systems-programing):
 //
-//	[wide: off] [refresh: 5s]
+//	[wide: off] [refresh: 5s] [/ search]
 //
 // Each is green when on: wide while the active tab shows its wide columns,
-// refresh while auto refresh runs.
+// refresh while auto refresh runs, search while the list is searched.
 func (m Model) panelButtons() []button {
+	buttons := []button{m.wideButton()}
+	if m.autoRefreshed() { // a tab that isn't auto refreshed (More) has no refresh button
+		buttons = append(buttons, m.refreshButton())
+	}
+	return append(buttons, m.searchButton())
+}
+
+// wideButton is "wide: off", or "wide: on" while the tab shows its wide columns.
+func (m Model) wideButton() button {
 	wide := button{name: buttonWide, label: "wide: off"}
 	if m.activeWide() {
 		wide.label, wide.on = "wide: on", true
 	}
+	return wide
+}
 
-	// A tab that isn't auto refreshed (More) has no refresh button.
-	if !m.autoRefreshed() {
-		return []button{wide}
-	}
-
+// refreshButton is "refresh: off", or the rate, e.g. "refresh: 5s".
+func (m Model) refreshButton() button {
 	refresh := button{name: buttonRefresh, label: "refresh: off"}
 	if m.refreshEvery != refreshOff {
 		refresh.label, refresh.on = "refresh: "+m.refreshEvery.String(), true
 	}
+	return refresh
+}
 
-	return []button{wide, refresh}
+// searchButton is "/ search", or what is searched for, "search: nginx",
+// with a caret while it is typed. A long search shows its end, where the
+// typing is.
+func (m Model) searchButton() button {
+	text := m.searchText()
+	if text == "" && !m.searching {
+		return button{name: buttonSearch, label: "/ search"}
+	}
+	if r := []rune(text); len(r) > searchLabelWidth {
+		text = "…" + string(r[len(r)-searchLabelWidth+1:])
+	}
+	if m.searching {
+		text += "█"
+	}
+	return button{name: buttonSearch, label: "search: " + text, on: true}
 }
 
 // focusedButton is the index of the button the cursor is on, or -1 if the

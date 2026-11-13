@@ -33,11 +33,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.items[msg.tab] = msg.rows
 		m.updated[msg.tab] = msg.at
 
-		// A refresh can return fewer rows (a node was removed):
-		// keep the cursor on a row that still exists.
+		// A refresh can return fewer rows (a node was removed, or fewer
+		// match the search): keep the cursor on a row that still exists.
 		if msg.tab == m.activeName() {
-			if m.cursor >= len(msg.rows) {
-				m.cursor = max(len(msg.rows)-1, 0)
+			if n := len(m.rows()); m.cursor >= n {
+				m.cursor = max(n-1, 0)
 			}
 			m = m.keepCursorVisible()
 		}
@@ -62,6 +62,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.overlay != overlayNone {
 			return m.onOverlayKey(msg)
 		}
+		if m.searching {
+			return m.onSearchKey(msg) // keys type the search (search.go)
+		}
 		return m.onKey(msg)
 	}
 	return m, nil
@@ -85,6 +88,16 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// w: wide columns on/off from anywhere, same as pressing the button.
 	case KeyWide:
 		return m.toggleWide()
+
+	// /: search the list, same as pressing the button (search.go).
+	case KeySearch:
+		return m.startSearch(), nil
+
+	// esc: clear the search, if there is one.
+	case KeyEsc:
+		if m.searchText() != "" {
+			return m.clearSearch(), nil
+		}
 
 	// tab: step the focus tabs → buttons → list → tabs.
 	case KeyTab:
@@ -193,6 +206,8 @@ func (m Model) pressButton() (tea.Model, tea.Cmd) {
 		return m.toggleWide()
 	case buttonRefresh:
 		return m.stepRefresh()
+	case buttonSearch:
+		return m.startSearch(), nil
 	}
 	return m, nil
 }

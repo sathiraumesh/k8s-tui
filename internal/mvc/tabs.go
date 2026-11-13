@@ -1,6 +1,7 @@
 package mvc
 
 import (
+	"strings"
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
@@ -102,7 +103,19 @@ func (m Model) kubectlCommand() string {
 	if cmd != "" && m.activeWide() {
 		cmd += " -o wide"
 	}
+	if s := m.searchText(); cmd != "" && s != "" {
+		cmd += " | grep -i " + shellQuote(s) // what the search does, in the shell
+	}
 	return cmd
+}
+
+// shellQuote writes s so the shell takes it as one word: as it is if it
+// is plain, else in single quotes.
+func shellQuote(s string) string {
+	if strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./:=") == "" {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // placeholder is the loader for a tab that isn't loaded from the cluster

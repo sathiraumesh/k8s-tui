@@ -14,14 +14,14 @@ var wideKey = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(KeyWide)}
 
 // ---------- the wide button ----------
 
-// The buttons are wide first, then refresh, as in systems-programing.
+// The buttons are wide, refresh, then search, as in systems-programing.
 func TestButtonOrder(t *testing.T) {
 	var names []string
 	for _, b := range New(nil).panelButtons() {
 		names = append(names, b.name)
 	}
-	if got := strings.Join(names, ","); got != "wide,refresh" {
-		t.Errorf("buttons = %s, want wide,refresh", got)
+	if got := strings.Join(names, ","); got != "wide,refresh,search" {
+		t.Errorf("buttons = %s, want wide,refresh,search", got)
 	}
 }
 

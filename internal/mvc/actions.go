@@ -209,12 +209,12 @@ func (m Model) chosen() action {
 // the tab has actions, and its rows have loaded without an error.
 func (m Model) canOpenActions() bool {
 	_, loaded := m.updated[m.activeName()]
-	return len(m.actions()) > 0 && loaded && m.err == nil && len(m.items[m.activeName()]) > 0
+	return len(m.actions()) > 0 && loaded && m.err == nil && len(m.rows()) > 0
 }
 
 // openActions opens the action list for the row the cursor is on.
 func (m Model) openActions() Model {
-	m.target = rowName(m.items[m.activeName()][m.cursor])
+	m.target = rowName(m.rows()[m.cursor])
 	m.overlay = overlayActions
 	m.overlayCursor = 0
 	return m

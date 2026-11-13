@@ -19,6 +19,9 @@ const (
 	// Go back from a page (action list, flags, text) to the one before
 	KeyEsc = "esc"
 
+	// Search the list of the tab on screen
+	KeySearch = "/"
+
 	// Delete the last letter typed in a text field
 	KeyBackspace = "backspace"
 

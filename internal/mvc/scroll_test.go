@@ -15,7 +15,8 @@ var (
 )
 
 // longList is a model whose Nodes tab has n rows ("node-0", "node-1", …), on
-// an 80×15 terminal: 15 - tab bar - help - 2 margins - 2 borders = 9 rows fit.
+// an 80×16 terminal: 16 - tab bar - help - 2 margins - 2 borders - the empty
+// row under the top border = 9 rows fit.
 func longList(t *testing.T, n int) Model {
 	t.Helper()
 	m := New(nil)
@@ -24,7 +25,7 @@ func longList(t *testing.T, n int) Model {
 		rows[i] = fmt.Sprintf("node-%d", i)
 	}
 	m.items["Nodes"] = rows
-	return sized(t, m, 80, 15)
+	return sized(t, m, 80, 16)
 }
 
 // inList moves the focus from the tabs into the list (past the buttons).
@@ -51,7 +52,7 @@ func shownRows(t *testing.T, m Model) []string {
 
 func TestListHeight(t *testing.T) {
 	if got := longList(t, 30).listHeight(); got != 9 {
-		t.Errorf("listHeight = %d at 15 rows, want 9", got)
+		t.Errorf("listHeight = %d at 16 rows, want 9", got)
 	}
 	if got := sized(t, New(nil), 80, 3).listHeight(); got != 1 {
 		t.Errorf("listHeight = %d on a 3-row terminal, want at least 1", got)
@@ -69,8 +70,8 @@ func TestShowsOnlyRowsThatFit(t *testing.T) {
 // The screen stays exactly the terminal's height however long the list is.
 func TestLongListKeepsScreenHeight(t *testing.T) {
 	for _, n := range []int{9, 10, 100, 1000} {
-		if h := lipgloss.Height(longList(t, n).View()); h != 15 {
-			t.Errorf("%d rows: screen is %d rows tall, want 15", n, h)
+		if h := lipgloss.Height(longList(t, n).View()); h != 16 {
+			t.Errorf("%d rows: screen is %d rows tall, want 16", n, h)
 		}
 	}
 }
@@ -177,9 +178,9 @@ func TestSwitchTabScrollsToTop(t *testing.T) {
 func TestResizeKeepsCursorVisible(t *testing.T) {
 	m := inList(t, longList(t, 30))
 	for range 8 {
-		m = press(t, m, down) // cursor 8: the last row at 15 rows tall
+		m = press(t, m, down) // cursor 8: the last row at 16 rows tall
 	}
-	m = press(t, m, tea.WindowSizeMsg{Width: 80, Height: 10}) // 4 rows fit
+	m = press(t, m, tea.WindowSizeMsg{Width: 80, Height: 11}) // 4 rows fit
 	if m.offset != 5 {
 		t.Errorf("offset = %d after shrinking, want 5 (cursor 8 on the last of 4 rows)", m.offset)
 	}
