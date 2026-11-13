@@ -34,6 +34,18 @@ func nodesOnScreen(t *testing.T) (Model, *fake.Clientset) {
 	return press(t, m, down, down, down), cs // tabs → buttons → list row 0 → row 1
 }
 
+// actionIndex is where the node action called name is in the action list.
+func actionIndex(t *testing.T, name string) int {
+	t.Helper()
+	for i, a := range nodeActions() {
+		if a.name == name {
+			return i
+		}
+	}
+	t.Fatalf("no node action %q", name)
+	return -1
+}
+
 // run runs cmd and passes its message to Update, as Bubble Tea would.
 func run(t *testing.T, m Model, cmd tea.Cmd) Model {
 	t.Helper()
@@ -138,7 +150,7 @@ func TestSpaceTicksFlag(t *testing.T) {
 		t.Errorf("command = %q, want the dry-run flag added", m.kubectlCommand())
 	}
 	// Ticking must not change the action's defaults.
-	if nodeActions()[2].flags[0].on {
+	if nodeActions()[actionIndex(t, "Cordon")].flags[0].on {
 		t.Error("ticking changed the action table's default")
 	}
 }
@@ -283,7 +295,10 @@ func topAndBottom(t *testing.T, m Model) (top, bottom string) {
 
 func TestViewActionList(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m = press(t, m, enterKey, down, down) // on Cordon
+	m = press(t, m, enterKey)
+	for range actionIndex(t, "Cordon") {
+		m = press(t, m, down) // to Cordon
+	}
 	out := m.View()
 	for _, want := range []string{"Describe", "Cordon", "Uncordon", "stop new pods"} {
 		if !strings.Contains(out, want) {
@@ -542,5 +557,57 @@ func TestChangeText(t *testing.T) {
 	}
 	if got := changeText("Taints", nil, nil); !strings.HasSuffix(got, "(none)") {
 		t.Errorf("no taints: %q", got)
+	}
+}
+
+// ---------- Shell ----------
+
+// The Shell page offers ubuntu instead of busybox, and the sysadmin profile.
+func TestShellFlags(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("x"))
+	if m.kubectlCommand() != "kubectl debug node/worker2 -it --image=busybox" {
+		t.Errorf("command = %q, want busybox by default", m.kubectlCommand())
+	}
+	if !strings.Contains(m.View(), "[ ] --image=ubuntu   (else --image=busybox)") {
+		t.Errorf("Shell page:\n%s", m.View())
+	}
+	m = press(t, m, spaceKey, down, spaceKey)
+	if m.kubectlCommand() != "kubectl debug node/worker2 -it --image=ubuntu --profile=sysadmin" {
+		t.Errorf("command = %q", m.kubectlCommand())
+	}
+}
+
+// Like every action that changes the cluster, the shell needs y.
+func TestShellNeedsYes(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("x"))
+	if _, cmd := m.Update(enterKey); cmd != nil {
+		t.Error("enter opened the shell, want only y to")
+	}
+	if next, _ := m.Update(key("y")); next.(Model).overlay != overlayNone {
+		t.Error("y didn't run the shell")
+	}
+}
+
+// When the shell closes, the help line says so, and that the debug pod is
+// left; the list reloads.
+func TestShellClosed(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	next, cmd := m.Update(actionDoneMsg{action: "Shell", target: "worker2", shell: true})
+	if m = next.(Model); !strings.HasPrefix(m.notice, "Shell on worker2 closed") || cmd == nil {
+		t.Errorf("notice = %q, reload = %v", m.notice, cmd != nil)
+	}
+	next, _ = m.Update(actionDoneMsg{action: "Shell", target: "worker2", shell: true, err: errors.New("kubectl not found")})
+	if m = next.(Model); !strings.Contains(m.notice, "failed: kubectl not found") {
+		t.Errorf("notice = %q", m.notice)
+	}
+}
+
+// A shell that ends with an exit code (the last command's) isn't a failure.
+func TestInTerminalIgnoresExitCode(t *testing.T) {
+	cmd := inTerminal("Shell", "worker2", nil, errors.New("kubectl not found"))
+	if msg := cmd().(actionDoneMsg); msg.err == nil || !msg.shell {
+		t.Errorf("msg = %+v, want the error", msg)
 	}
 }

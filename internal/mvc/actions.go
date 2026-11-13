@@ -2,7 +2,9 @@ package mvc
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os/exec"
 	"slices"
 	"strings"
 
@@ -21,7 +23,9 @@ import (
 //	                                                               │
 //	                         a change: back to the list, reloaded ◀┤
 //	                         a dry run: what it would change      ◀┤
-//	                         a read: a page of text (Describe)    ◀┘
+//	                         a read: a page of text (Describe)    ◀┤
+//	                         a shell: kubectl has the terminal,
+//	                                  back to the list when it ends ◀┘
 //
 // How the pages are drawn is in actions_view.go.
 
@@ -41,6 +45,20 @@ const (
 type flag struct {
 	name string
 	on   bool // ticked; the action's list gives the default
+
+	// off is written in the command instead while the flag isn't ticked,
+	// for a choice of two, e.g. "--image=busybox" for "--image=ubuntu".
+	// "" for nothing.
+	off string
+}
+
+// String is how the flag is written in the command now: its name if it is
+// ticked, else its off form.
+func (f flag) String() string {
+	if f.on {
+		return f.name
+	}
+	return f.off
 }
 
 // action is something that can be done to one row.
@@ -77,8 +95,8 @@ func (a action) commandFor(target, input string, flags []flag) string {
 		parts = append(parts, input)
 	}
 	for _, f := range flags {
-		if f.on {
-			parts = append(parts, f.name)
+		if s := f.String(); s != "" {
+			parts = append(parts, s)
 		}
 	}
 	return strings.Join(parts, " ")
@@ -119,6 +137,24 @@ func change(name, target string, flags []flag, do func(context.Context) (string,
 		text, err := do(ctx)
 		return actionDoneMsg{action: name, target: target, changed: true, dryRun: ticked(flags, flagDryRun), text: text, err: err}
 	}
+}
+
+// inTerminal returns the command for an action that needs the terminal to
+// itself, such as a shell: the app steps aside while cmd runs and comes
+// back when it ends. err is from making cmd, e.g. kubectl isn't installed.
+func inTerminal(name, target string, cmd *exec.Cmd, err error) tea.Cmd {
+	if err != nil {
+		return func() tea.Msg { return actionDoneMsg{action: name, target: target, shell: true, err: err} }
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		// A shell ends with the code of the last thing typed in it, which
+		// isn't a failure of the shell: only failing to start is.
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			err = nil
+		}
+		return actionDoneMsg{action: name, target: target, shell: true, err: err}
+	})
 }
 
 // changeText shows what a change does to a list, e.g. a node's labels:
@@ -235,6 +271,10 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	case msg.err != nil:
 		m.notice = what + " failed: " + msg.err.Error()
 		return m, nil
+	case msg.shell:
+		// Like kubectl, the debug pod is left behind.
+		m.notice = msg.action + " on " + msg.target + " closed; its debug pod is still there, delete it when you are done"
+		return m, m.loadActive()
 	case msg.changed && msg.dryRun:
 		m.notice = what + ": dry run passed, nothing changed"
 		if msg.text != "" {

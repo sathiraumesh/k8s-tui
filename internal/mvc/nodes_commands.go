@@ -88,6 +88,13 @@ func alignColumns(rows [][]string) []string {
 // flagNoEvents leaves the events out of Describe.
 const flagNoEvents = "--show-events=false"
 
+// The Shell flags: ubuntu instead of busybox, and a privileged pod.
+const (
+	flagUbuntu   = "--image=" + k8s.ShellImageUbuntu
+	flagBusybox  = "--image=" + k8s.ShellImageBusybox
+	flagSysadmin = "--profile=sysadmin"
+)
+
 // flagOverwrite lets Label and Taint replace a label's value, or a taint
 // with the same key and effect, that the node already has.
 const flagOverwrite = "--overwrite"
@@ -114,6 +121,20 @@ func nodeActions() []action {
 					labels, taints, err := c.LabelsAndTaints(ctx, target)
 					return labelsAndTaintsText(labels, taints), err
 				})
+			},
+		},
+		{
+			key: "x", name: "Shell", about: "a shell on the node, in a debug pod; the node's files are in /host",
+			changes: true, // it starts a pod on the node
+			flags:   []flag{{name: flagUbuntu, off: flagBusybox}, {name: flagSysadmin}},
+			command: "kubectl debug node/%s -it",
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
+				image := k8s.ShellImageBusybox
+				if ticked(flags, flagUbuntu) {
+					image = k8s.ShellImageUbuntu
+				}
+				cmd, err := c.NodeShell(target, image, ticked(flags, flagSysadmin))
+				return inTerminal("Shell", target, cmd, err)
 			},
 		},
 		{

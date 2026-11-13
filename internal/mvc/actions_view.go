@@ -92,7 +92,11 @@ func (m Model) confirmRows() (rows []string, cursor int) {
 			if f.on {
 				box = "[x]"
 			}
-			rows = append(rows, box+" "+f.name)
+			row := box + " " + f.name
+			if f.off != "" {
+				row += "   (else " + f.off + ")"
+			}
+			rows = append(rows, row)
 		}
 		rows = append(rows, "")
 	}
