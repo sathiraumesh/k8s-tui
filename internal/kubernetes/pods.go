@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/kubectl/pkg/describe"
 )
 
 // Pod is one pod, with what `kubectl get pods -o wide` shows of it.
@@ -252,4 +253,126 @@ func (c *Client) RunPod(ctx context.Context, namespace, name, image string, dryR
 	}
 	_, err := c.clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
 	return err
+}
+
+// DescribePod returns what `kubectl describe pod NAME -n NAMESPACE` prints,
+// using kubectl's own describer, so the text is the same: containers,
+// their state and restarts, volumes, conditions and the events. With
+// showEvents false the events are left out (`--show-events=false`).
+//
+// As for DescribeNode, ctx can't cancel kubectl's describer.
+func (c *Client) DescribePod(_ context.Context, namespace, name string, showEvents bool) (string, error) {
+	d := &describe.PodDescriber{Interface: c.clientset}
+	return d.Describe(namespace, name, describe.DescriberSettings{ShowEvents: showEvents, ChunkSize: 500})
+}
+
+// ---------- actions: things that can be done to one pod ----------
+
+// PodLogs returns the last tail lines each container of the pod wrote,
+// like `kubectl logs NAME -n NAMESPACE --all-containers --tail=TAIL`. With
+// previous, the logs are those of the container's run before its last
+// restart (`--previous`); with timestamps, every line starts with its time
+// (`--timestamps`).
+//
+// A pod with more than one container has a heading per container:
+//
+//	==> app <==
+//	…
+//	==> sidecar <==
+//	…
+//
+// A container whose logs can't be read (with previous, one that never
+// restarted) says why under its heading; the others are still shown.
+func (c *Client) PodLogs(ctx context.Context, namespace, name string, previous, timestamps bool, tail int64) (string, error) {
+	pods := c.clientset.CoreV1().Pods(namespace)
+	pod, err := pods.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var containers []string
+	for _, ct := range pod.Spec.InitContainers {
+		containers = append(containers, ct.Name)
+	}
+	for _, ct := range pod.Spec.Containers {
+		containers = append(containers, ct.Name)
+	}
+
+	var b strings.Builder
+	for _, container := range containers {
+		opts := &corev1.PodLogOptions{Container: container, Previous: previous, Timestamps: timestamps, TailLines: &tail}
+		logs, err := pods.GetLogs(name, opts).DoRaw(ctx)
+		if len(containers) == 1 {
+			return string(logs), err
+		}
+		fmt.Fprintf(&b, "==> %s <==\n", container)
+		if err != nil {
+			fmt.Fprintf(&b, "error: %v\n", err)
+		} else if len(logs) == 0 {
+			b.WriteString("(no logs)\n")
+		} else {
+			b.Write(logs)
+			if logs[len(logs)-1] != '\n' {
+				b.WriteByte('\n')
+			}
+		}
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
+}
+
+// LabelsAndAnnotations returns the pod's labels and annotations, as
+// key=value sorted by key.
+func (c *Client) LabelsAndAnnotations(ctx context.Context, namespace, name string) (labels, annotations []string, err error) {
+	p, err := c.clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	return pairs(p.Labels), pairs(p.Annotations), nil
+}
+
+// LabelPod sets and removes labels on the pod, like
+// `kubectl label pod NAME -n NAMESPACE env=prod old-`, with the same rules
+// as Label for a node. It returns the pod's labels before and after.
+func (c *Client) LabelPod(ctx context.Context, namespace, name string, changes []string, overwrite, dryRun bool) (Change, error) {
+	set, remove, err := parseLabels(changes)
+	if err != nil {
+		return Change{}, err
+	}
+	pods := c.clientset.CoreV1().Pods(namespace)
+	before, err := pods.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return Change{}, err
+	}
+	edited := before.DeepCopy()
+	if err := applyLabels(&edited.Labels, set, remove, overwrite); err != nil {
+		return Change{}, err
+	}
+	opts := metav1.UpdateOptions{}
+	if dryRun {
+		opts.DryRun = []string{metav1.DryRunAll}
+	}
+	after, err := pods.Update(ctx, edited, opts)
+	if err != nil {
+		return Change{}, err
+	}
+	return Change{Before: pairs(before.Labels), After: pairs(after.Labels)}, nil
+}
+
+// DeletePod deletes the pod, like `kubectl delete pod NAME -n NAMESPACE`.
+// Its containers are asked to stop and given their grace period (30s
+// unless the pod says otherwise); with now they get 1 second (`--now`).
+// If something manages the pod, such as a deployment, it starts a new one.
+//
+// With dryRun the cluster checks it but deletes nothing.
+func (c *Client) DeletePod(ctx context.Context, namespace, name string, now, dryRun bool) error {
+	opts := metav1.DeleteOptions{}
+	if now {
+		grace := int64(1)
+		opts.GracePeriodSeconds = &grace
+	}
+	if dryRun {
+		opts.DryRun = []string{metav1.DryRunAll}
+	}
+	return c.clientset.CoreV1().Pods(namespace).Delete(ctx, name, opts)
 }

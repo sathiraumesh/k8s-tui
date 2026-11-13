@@ -82,3 +82,22 @@ func TestEditNodeWithoutKubectl(t *testing.T) {
 		t.Error("err = nil, want kubectl not found")
 	}
 }
+
+func TestPodShellArgs(t *testing.T) {
+	if got := PodShellArgs("apps", "web", false, ""); !slices.Equal(got, []string{"exec", "-it", "web", "-n", "apps", "--", "sh"}) {
+		t.Errorf("sh: %v", got)
+	}
+	// The context goes before the "--": after it, everything is for the shell.
+	want := []string{"exec", "-it", "web", "-n", "apps", "--context=lab", "--", "bash"}
+	if got := PodShellArgs("apps", "web", true, "lab"); !slices.Equal(got, want) {
+		t.Errorf("bash: %v, want %v", got, want)
+	}
+}
+
+func TestEditPod(t *testing.T) {
+	pretendKubectl(t, "/bin/kubectl")
+	cmd, err := NewClientFromClientset(fake.NewClientset()).EditPod("apps", "web")
+	if err != nil || !slices.Equal(cmd.Args, []string{"/bin/kubectl", "edit", "pod", "web", "-n", "apps"}) {
+		t.Errorf("command = %v, err = %v", cmd.Args, err)
+	}
+}

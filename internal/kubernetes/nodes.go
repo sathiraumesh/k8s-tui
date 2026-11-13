@@ -159,32 +159,18 @@ func (c *Client) DescribeNode(_ context.Context, name string, showEvents bool) (
 //
 // It returns the node's labels before and after, as key=value. After a dry
 // run, after is what the cluster would have saved.
-func (c *Client) Label(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (NodeChange, error) {
+func (c *Client) Label(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (Change, error) {
 	set, remove, err := parseLabels(changes)
 	if err != nil {
-		return NodeChange{}, err
+		return Change{}, err
 	}
 	before, after, err := c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
-		for _, l := range set {
-			if old, ok := n.Labels[l.key]; ok && old != l.value && !overwrite {
-				return fmt.Errorf("label %q already has a value (%s), and --overwrite is false", l.key, old)
-			}
-		}
-		if n.Labels == nil {
-			n.Labels = map[string]string{}
-		}
-		for _, l := range set {
-			n.Labels[l.key] = l.value
-		}
-		for _, key := range remove {
-			delete(n.Labels, key) // like kubectl, removing a label that isn't there is fine
-		}
-		return nil
+		return applyLabels(&n.Labels, set, remove, overwrite)
 	})
 	if err != nil {
-		return NodeChange{}, err
+		return Change{}, err
 	}
-	return NodeChange{Before: labelStrings(before), After: labelStrings(after)}, nil
+	return Change{Before: labelStrings(before), After: labelStrings(after)}, nil
 }
 
 // LabelsAndTaints returns the node's labels, as key=value sorted by key, and
@@ -200,12 +186,7 @@ func (c *Client) LabelsAndTaints(ctx context.Context, name string) (labels, tain
 
 // labelStrings is the node's labels as key=value, sorted by key.
 func labelStrings(n *corev1.Node) []string {
-	out := make([]string, 0, len(n.Labels))
-	for k, v := range n.Labels {
-		out = append(out, k+"="+v)
-	}
-	sort.Strings(out)
-	return out
+	return pairs(n.Labels)
 }
 
 // label is one key=value to set.
@@ -259,10 +240,10 @@ func parseLabels(changes []string) (set []label, remove []string, err error) {
 // (`--overwrite`); dryRun is `--dry-run=server`.
 //
 // It returns the node's taints before and after, as key=value:Effect.
-func (c *Client) Taint(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (NodeChange, error) {
+func (c *Client) Taint(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (Change, error) {
 	add, remove, err := parseTaints(changes)
 	if err != nil {
-		return NodeChange{}, err
+		return Change{}, err
 	}
 	before, after, err := c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
 		for _, r := range remove {
@@ -291,9 +272,9 @@ func (c *Client) Taint(ctx context.Context, name string, changes []string, overw
 		return nil
 	})
 	if err != nil {
-		return NodeChange{}, err
+		return Change{}, err
 	}
-	return NodeChange{Before: taintStrings(before), After: taintStrings(after)}, nil
+	return Change{Before: taintStrings(before), After: taintStrings(after)}, nil
 }
 
 // taintStrings is the node's taints as key=value:Effect, in the node's order.
@@ -357,12 +338,6 @@ func checkKey(key string) error {
 		return fmt.Errorf("key %q: %s", key, strings.Join(errs, "; "))
 	}
 	return nil
-}
-
-// NodeChange is what a change did to a node, or with a dry run would have
-// done: the labels or taints before and after it.
-type NodeChange struct {
-	Before, After []string
 }
 
 // updateNode reads the node, lets change edit it, and saves it: a GET then

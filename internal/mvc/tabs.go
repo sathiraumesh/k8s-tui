@@ -43,6 +43,14 @@ type tab struct {
 	// opens them (actions.go). nil if the tab has none.
 	actions []action
 
+	// rowTarget is what a row's actions are for, e.g. "worker1", or for a
+	// pod "default/web". nil means the row's first column.
+	//
+	// commandTarget is how that is written in a kubectl command, e.g.
+	// "default/web" as "web -n default". nil writes it as it is.
+	rowTarget     func(row string) string
+	commandTarget func(target string) string
+
 	// own are actions of the tab itself, not of a row, e.g. running a new
 	// pod: the tab's button (ownButton, e.g. "+ run") or KeyOwn opens them.
 	// ownTitle heads their list ("Run a pod"), and ownTarget is what they
@@ -69,14 +77,17 @@ func allTabs() []tab {
 			autoRefresh: true,
 		},
 		{
-			name:        tabPods,
-			load:        loadPods,
-			command:     "kubectl get pods --all-namespaces",
-			own:         runPodActions(),
-			ownButton:   "+ run",
-			ownTitle:    "Run a pod",
-			ownTarget:   runNamespace,
-			autoRefresh: true,
+			name:          tabPods,
+			load:          loadPods,
+			command:       "kubectl get pods --all-namespaces",
+			actions:       podActions(),
+			rowTarget:     podTarget,
+			commandTarget: podArgs,
+			own:           runPodActions(),
+			ownButton:     "+ run",
+			ownTitle:      "Run a pod",
+			ownTarget:     runNamespace,
+			autoRefresh:   true,
 		},
 		{
 			name:        tabDeployments,
@@ -108,9 +119,9 @@ func (m Model) kubectlCommand() string {
 	switch m.overlay {
 	case overlayActions:
 		a := m.actions()[m.overlayCursor]
-		return a.commandFor(m.target, a.inputDefault, a.flags)
+		return a.commandFor(m.commandTarget(), a.inputDefault, a.flags)
 	case overlayConfirm, overlayText:
-		return m.chosen().commandFor(m.target, m.input, m.flags)
+		return m.chosen().commandFor(m.commandTarget(), m.input, m.flags)
 	}
 	cmd := m.activeTab().command
 	if cmd != "" && m.activeWide() {

@@ -69,6 +69,129 @@ func age(t, now time.Time) string {
 	return duration.HumanDuration(now.Sub(t))
 }
 
+// ---------- actions on a pod ----------
+
+// podTarget is what a pod row's actions are for: "NAMESPACE/NAME", from
+// its first two columns.
+func podTarget(row string) string {
+	f := strings.Fields(row)
+	if len(f) < 2 {
+		return rowName(row)
+	}
+	return f[0] + "/" + f[1]
+}
+
+// splitTarget splits "NAMESPACE/NAME" into its two parts.
+func splitTarget(target string) (namespace, name string) {
+	namespace, name, _ = strings.Cut(target, "/")
+	return namespace, name
+}
+
+// podArgs writes "NAMESPACE/NAME" the way kubectl takes it: "NAME -n NAMESPACE".
+func podArgs(target string) string {
+	namespace, name := splitTarget(target)
+	return name + " -n " + namespace
+}
+
+// Flags of the pod actions.
+const (
+	flagPrevious   = "--previous"   // Logs: the run before the last restart
+	flagTimestamps = "--timestamps" // Logs: each line's time
+	flagBash       = "-- bash"      // Shell: bash instead of sh
+	flagSh         = "-- sh"
+	flagNow        = "--now" // Delete: 1 second to stop, not the grace period
+)
+
+// logTail is how many of the last lines of each container Logs shows.
+const logTail = 500
+
+// podActions are the actions of the Pods tab: enter on a pod opens them.
+// The keys are the same as for a node where the action is the same. The
+// cluster calls they make are in internal/kubernetes/pods.go and
+// terminal.go.
+func podActions() []action {
+	return []action{
+		{
+			key: "d", name: "Describe", about: "everything about the pod, like kubectl describe",
+			flags:   []flag{{name: flagNoEvents}},
+			command: "kubectl describe pod %s",
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				return read("Describe", target, func(ctx context.Context) (string, error) {
+					return c.DescribePod(ctx, namespace, name, !ticked(flags, flagNoEvents))
+				})
+			},
+		},
+		{
+			key: "o", name: "Logs", about: fmt.Sprintf("the last %d lines of each container, newest at the bottom", logTail),
+			flags:   []flag{{name: flagPrevious}, {name: flagTimestamps}},
+			command: fmt.Sprintf("kubectl logs %%s --all-containers --tail=%d", logTail),
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				return readToEnd("Logs", target, func(ctx context.Context) (string, error) {
+					return c.PodLogs(ctx, namespace, name, ticked(flags, flagPrevious), ticked(flags, flagTimestamps), logTail)
+				})
+			},
+		},
+		{
+			key: "s", name: "Show", about: "the pod's labels and annotations",
+			command: "kubectl get pod %s --show-labels",
+			run: func(c *k8s.Client, target, _ string, _ []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				return read("Show", target, func(ctx context.Context) (string, error) {
+					labels, annotations, err := c.LabelsAndAnnotations(ctx, namespace, name)
+					return sectionsText(section{"Labels", labels}, section{"Annotations", annotations}), err
+				})
+			},
+		},
+		{
+			key: "x", name: "Shell", about: "a shell in the pod's first container; the image needs sh (or bash)",
+			flags:   []flag{{name: flagBash, off: flagSh}},
+			command: "kubectl exec -it %s",
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				cmd, err := c.PodShell(namespace, name, ticked(flags, flagBash))
+				return inTerminal("Shell", target, "Shell in "+target+" closed", true, cmd, err)
+			},
+		},
+		{
+			key: "e", name: "Edit", about: "the pod's YAML in your editor; most of a running pod can't change",
+			command: "kubectl edit pod %s",
+			run: func(c *k8s.Client, target, _ string, _ []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				cmd, err := c.EditPod(namespace, name)
+				return inTerminal("Edit", target, "Edit "+target+": editor closed", false, cmd, err)
+			},
+		},
+		{
+			key: "l", name: "Label", about: "set labels (key=value) or remove them (key-), several with spaces",
+			changes: true,
+			input:   "labels",
+			flags:   []flag{{name: flagOverwrite}, {name: flagDryRun}},
+			command: "kubectl label pod %s",
+			run: func(c *k8s.Client, target, input string, flags []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				return change("Label", target, flags, func(ctx context.Context) (string, error) {
+					ch, err := c.LabelPod(ctx, namespace, name, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
+					return changeText("Labels", ch.Before, ch.After), err
+				})
+			},
+		},
+		{
+			key: "r", name: "Delete", about: "remove the pod; if a deployment or the like owns it, a new one starts",
+			changes: true,
+			flags:   []flag{{name: flagNow}, {name: flagDryRun}},
+			command: "kubectl delete pod %s",
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
+				namespace, name := splitTarget(target)
+				return change("Delete", target, flags, func(ctx context.Context) (string, error) {
+					return "", c.DeletePod(ctx, namespace, name, ticked(flags, flagNow), ticked(flags, flagDryRun))
+				})
+			},
+		},
+	}
+}
+
 // ---------- running a new pod ----------
 
 // runNamespace is where a new pod goes: the tab shows every namespace, and

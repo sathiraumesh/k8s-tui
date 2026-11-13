@@ -143,6 +143,17 @@ func read(name, target string, get func(context.Context) (string, error)) tea.Cm
 	}
 }
 
+// readToEnd is read for a text whose end matters most, such as logs: the
+// page opens scrolled to its last line.
+func readToEnd(name, target string, get func(context.Context) (string, error)) tea.Cmd {
+	cmd := read(name, target, get)
+	return func() tea.Msg {
+		msg := cmd().(actionDoneMsg)
+		msg.atEnd = true
+		return msg
+	}
+}
+
 // change returns the command for an action that changes the cluster: it
 // runs do and reports whether it worked. do may also return a text of what
 // changed (see changeText); after a dry run it is shown on a page.
@@ -186,6 +197,37 @@ func terminalError(shell bool, err error) error {
 	return fmt.Errorf("kubectl ended with an error (%w)", err)
 }
 
+// section is one titled list of a page of text, e.g. a node's labels.
+type section struct {
+	title string
+	items []string
+}
+
+// sectionsText is a page of titled lists, e.g. the Show page of a node:
+//
+//	Labels:
+//
+//	  env=prod
+//	  kubernetes.io/os=linux
+//
+//	Taints:
+//
+//	  (none)
+func sectionsText(sections ...section) string {
+	var lines []string
+	for _, s := range sections {
+		lines = append(lines, s.title+":", "")
+		if len(s.items) == 0 {
+			lines = append(lines, "  (none)")
+		}
+		for _, item := range s.items {
+			lines = append(lines, "  "+item)
+		}
+		lines = append(lines, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
 // changeText shows what a change does to a list, e.g. a node's labels:
 // every item after it, "+" for the new ones, then "-" for the removed ones.
 //
@@ -224,6 +266,24 @@ func rowName(row string) string {
 	return ""
 }
 
+// rowTarget is what the actions of row are for (see tab.rowTarget).
+func (m Model) rowTarget(row string) string {
+	if f := m.activeTab().rowTarget; f != nil {
+		return f(row)
+	}
+	return rowName(row)
+}
+
+// commandTarget is the target as the kubectl commands write it, e.g.
+// "web -n default" (see tab.commandTarget). The tab's own actions get
+// their target as it is: it is already what their commands take.
+func (m Model) commandTarget() string {
+	if f := m.activeTab().commandTarget; f != nil && !m.tabActions {
+		return f(m.target)
+	}
+	return m.target
+}
+
 // actions are the active tab's actions for a row, or while its own action
 // list is open (tabActions), the tab's own actions, e.g. Run on Pods.
 func (m Model) actions() []action {
@@ -247,7 +307,7 @@ func (m Model) canOpenActions() bool {
 
 // openActions opens the action list for the row the cursor is on.
 func (m Model) openActions() Model {
-	m.target = rowName(m.rows()[m.cursor])
+	m.target = m.rowTarget(m.rows()[m.cursor])
 	m.tabActions = false
 	m.overlay = overlayActions
 	m.overlayCursor = 0
@@ -294,7 +354,7 @@ func (m Model) runChosen() (Model, tea.Cmd) {
 		m.overlayCursor = 0 // on the text field
 		return m, nil
 	}
-	m.notice = "running: " + a.commandFor(m.target, m.input, m.flags)
+	m.notice = "running: " + a.commandFor(m.commandTarget(), m.input, m.flags)
 	if a.changes {
 		m.overlay = overlayNone // back to the list while it runs
 		m.tabActions = false
@@ -337,7 +397,11 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 		return m, m.loadActive()
 	}
 	m.notice = ""
-	return m.showText(msg.text), nil
+	m = m.showText(msg.text)
+	if msg.atEnd {
+		m.textOffset = max(len(m.text)-m.listHeight(), 0) // the last lines on screen
+	}
+	return m, nil
 }
 
 // showText opens the text page with text, scrolled to the top.

@@ -100,7 +100,7 @@ func TestRunPodRuns(t *testing.T) {
 		t.Errorf("pod = %+v, err = %v", p, err)
 	}
 	// Back on the list, enter is for a pod's actions again, not the images.
-	if len(m.actions()) != 0 {
+	if m.tabActions || m.actions()[0].name != "Describe" {
 		t.Error("the image list is still the tab's actions after running")
 	}
 }

@@ -119,7 +119,7 @@ func nodeActions() []action {
 			run: func(c *k8s.Client, target, _ string, _ []flag) tea.Cmd {
 				return read("Show", target, func(ctx context.Context) (string, error) {
 					labels, taints, err := c.LabelsAndTaints(ctx, target)
-					return labelsAndTaintsText(labels, taints), err
+					return sectionsText(section{"Labels", labels}, section{"Taints", taints}), err
 				})
 			},
 		},
@@ -196,32 +196,4 @@ func nodeActions() []action {
 			},
 		},
 	}
-}
-
-// labelsAndTaintsText is the Show page:
-//
-//	Labels:
-//
-//	  env=prod
-//	  kubernetes.io/os=linux
-//
-//	Taints:
-//
-//	  (none)
-func labelsAndTaintsText(labels, taints []string) string {
-	var lines []string
-	for _, part := range []struct {
-		title string
-		items []string
-	}{{"Labels", labels}, {"Taints", taints}} {
-		lines = append(lines, part.title+":", "")
-		if len(part.items) == 0 {
-			lines = append(lines, "  (none)")
-		}
-		for _, item := range part.items {
-			lines = append(lines, "  "+item)
-		}
-		lines = append(lines, "")
-	}
-	return strings.Join(lines, "\n")
 }

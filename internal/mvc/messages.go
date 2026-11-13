@@ -54,6 +54,7 @@ type actionDoneMsg struct {
 	err    error  // set if it failed
 
 	text    string // what a read action returned (the Describe text), or what a dry run would change
+	atEnd   bool   // the text page opens scrolled to its end (logs)
 	changed bool   // it was a change: the tab is reloaded to show it
 	dryRun  bool   // it was a change run with --dry-run=server: nothing was saved
 	// terminal is whether it ran kubectl in the terminal (a shell, an

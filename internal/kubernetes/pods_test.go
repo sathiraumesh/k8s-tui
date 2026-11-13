@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -244,5 +245,135 @@ func TestRunPodAlreadyExists(t *testing.T) {
 	cs := fake.NewClientset(fakePod("default", "web"))
 	if err := NewClientFromClientset(cs).RunPod(context.Background(), "default", "web", "nginx", false); err == nil {
 		t.Error("err = nil, want already exists")
+	}
+}
+
+func TestDescribePod(t *testing.T) {
+	cs := fake.NewClientset(fakePod("apps", "web"))
+	text, err := NewClientFromClientset(cs).DescribePod(context.Background(), "apps", "web", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Name:", "web", "Namespace:", "apps", "Node:", "worker1", "app:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("describe output is missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestDescribeMissingPod(t *testing.T) {
+	if _, err := NewClientFromClientset(fake.NewClientset()).DescribePod(context.Background(), "apps", "nope", true); err == nil {
+		t.Error("err = nil, want an error for a pod that doesn't exist")
+	}
+}
+
+// ---------- actions ----------
+
+func TestPodLogsOneContainer(t *testing.T) {
+	cs := fake.NewClientset(fakePod("apps", "web"))
+	var got *corev1.PodLogOptions
+	cs.PrependReactor("get", "pods", func(a k8stesting.Action) (bool, runtime.Object, error) {
+		if g, ok := a.(k8stesting.GenericActionImpl); ok && a.GetSubresource() == "log" {
+			got = g.Value.(*corev1.PodLogOptions)
+		}
+		return false, nil, nil
+	})
+	logs, err := NewClientFromClientset(cs).PodLogs(context.Background(), "apps", "web", true, true, 500)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if logs != "fake logs" || strings.Contains(logs, "==>") {
+		t.Errorf("logs = %q, want the fake logs, no heading", logs)
+	}
+	if got == nil || got.Container != "app" || !got.Previous || !got.Timestamps || *got.TailLines != 500 {
+		t.Errorf("log options = %+v", got)
+	}
+}
+
+func TestPodLogsManyContainers(t *testing.T) {
+	p := fakePod("apps", "web")
+	p.Spec.InitContainers = []corev1.Container{{Name: "init"}}
+	p.Spec.Containers = append(p.Spec.Containers, corev1.Container{Name: "sidecar"})
+	logs, err := NewClientFromClientset(fake.NewClientset(p)).PodLogs(context.Background(), "apps", "web", false, false, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"==> init <==", "==> app <==", "==> sidecar <==", "fake logs"} {
+		if !strings.Contains(logs, want) {
+			t.Errorf("logs are missing %q:\n%s", want, logs)
+		}
+	}
+}
+
+func TestPodLogsMissingPod(t *testing.T) {
+	if _, err := NewClientFromClientset(fake.NewClientset()).PodLogs(context.Background(), "apps", "nope", false, false, 10); err == nil {
+		t.Error("err = nil for a pod that doesn't exist")
+	}
+}
+
+func TestLabelsAndAnnotations(t *testing.T) {
+	p := fakePod("apps", "web")
+	p.Labels = map[string]string{"run": "web", "app": "shop"}
+	p.Annotations = map[string]string{"note": "hi"}
+	labels, annotations, err := NewClientFromClientset(fake.NewClientset(p)).LabelsAndAnnotations(context.Background(), "apps", "web")
+	if err != nil || strings.Join(labels, ",") != "app=shop,run=web" || strings.Join(annotations, ",") != "note=hi" {
+		t.Errorf("labels = %v, annotations = %v, err = %v", labels, annotations, err)
+	}
+}
+
+func TestLabelPod(t *testing.T) {
+	p := fakePod("apps", "web")
+	p.Labels = map[string]string{"run": "web", "old": "x"}
+	cs := fake.NewClientset(p)
+	c := NewClientFromClientset(cs)
+	ch, err := c.LabelPod(context.Background(), "apps", "web", []string{"env=prod", "old-"}, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(ch.Before, ",") != "old=x,run=web" || strings.Join(ch.After, ",") != "env=prod,run=web" {
+		t.Errorf("change = %+v", ch)
+	}
+	if _, err := c.LabelPod(context.Background(), "apps", "web", []string{"env=dev"}, false, false); err == nil {
+		t.Error("changed a label without overwrite")
+	}
+	if _, err := c.LabelPod(context.Background(), "apps", "web", []string{"bad key=x"}, false, false); err == nil {
+		t.Error("err = nil for a bad key")
+	}
+}
+
+func TestDeletePod(t *testing.T) {
+	cs := fake.NewClientset(fakePod("apps", "web"))
+	if err := NewClientFromClientset(cs).DeletePod(context.Background(), "apps", "web", false, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.CoreV1().Pods("apps").Get(context.Background(), "web", metav1.GetOptions{}); err == nil {
+		t.Error("the pod is still there")
+	}
+}
+
+// --now gives the containers 1 second, and a dry run deletes nothing.
+func TestDeletePodOptions(t *testing.T) {
+	for _, tc := range []struct{ now, dryRun bool }{{false, false}, {true, false}, {false, true}} {
+		cs := fake.NewClientset(fakePod("apps", "web"))
+		var got metav1.DeleteOptions
+		cs.PrependReactor("delete", "pods", func(a k8stesting.Action) (bool, runtime.Object, error) {
+			got = a.(k8stesting.DeleteActionImpl).DeleteOptions
+			return true, nil, nil
+		})
+		if err := NewClientFromClientset(cs).DeletePod(context.Background(), "apps", "web", tc.now, tc.dryRun); err != nil {
+			t.Fatal(err)
+		}
+		if hasGrace := got.GracePeriodSeconds != nil && *got.GracePeriodSeconds == 1; hasGrace != tc.now {
+			t.Errorf("now = %v: grace = %v", tc.now, got.GracePeriodSeconds)
+		}
+		if isDryRun := len(got.DryRun) == 1; isDryRun != tc.dryRun {
+			t.Errorf("dryRun = %v: options = %+v", tc.dryRun, got)
+		}
+	}
+}
+
+func TestDeleteMissingPod(t *testing.T) {
+	if err := NewClientFromClientset(fake.NewClientset()).DeletePod(context.Background(), "apps", "nope", false, false); err == nil {
+		t.Error("err = nil for a pod that doesn't exist")
 	}
 }
