@@ -195,3 +195,54 @@ func TestPodRestartsWhileInitializing(t *testing.T) {
 		t.Errorf("restarts = %d, status = %q, want 6, Init:CrashLoopBackOff", got.Restarts, got.Status)
 	}
 }
+
+func TestRunPod(t *testing.T) {
+	cs := fake.NewClientset()
+	if err := NewClientFromClientset(cs).RunPod(context.Background(), "default", "web", "nginx:latest", false); err != nil {
+		t.Fatal(err)
+	}
+	p, err := cs.CoreV1().Pods("default").Get(context.Background(), "web", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Labels["run"] != "web" || len(p.Spec.Containers) != 1 || p.Spec.Containers[0].Name != "web" || p.Spec.Containers[0].Image != "nginx:latest" {
+		t.Errorf("pod = %+v", p)
+	}
+}
+
+func TestRunPodDryRun(t *testing.T) {
+	cs := fake.NewClientset()
+	var got k8stesting.CreateActionImpl
+	cs.PrependReactor("create", "pods", func(a k8stesting.Action) (bool, runtime.Object, error) {
+		got = a.(k8stesting.CreateActionImpl)
+		return true, nil, nil // a dry run saves nothing
+	})
+	if err := NewClientFromClientset(cs).RunPod(context.Background(), "default", "web", "nginx", true); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.CreateOptions.DryRun) != 1 || got.CreateOptions.DryRun[0] != metav1.DryRunAll {
+		t.Errorf("create options = %+v, want a dry run", got.CreateOptions)
+	}
+}
+
+func TestRunPodChecks(t *testing.T) {
+	c := NewClientFromClientset(fake.NewClientset())
+	for _, tc := range []struct{ name, image string }{
+		{"", "nginx"},    // no name
+		{"Web", "nginx"}, // capitals
+		{"web pod", "nginx"},
+		{"web", ""},       // no image
+		{"web", "ngi nx"}, // space in the image
+	} {
+		if err := c.RunPod(context.Background(), "default", tc.name, tc.image, false); err == nil {
+			t.Errorf("RunPod(%q, %q): err = nil, want an error", tc.name, tc.image)
+		}
+	}
+}
+
+func TestRunPodAlreadyExists(t *testing.T) {
+	cs := fake.NewClientset(fakePod("default", "web"))
+	if err := NewClientFromClientset(cs).RunPod(context.Background(), "default", "web", "nginx", false); err == nil {
+		t.Error("err = nil, want already exists")
+	}
+}

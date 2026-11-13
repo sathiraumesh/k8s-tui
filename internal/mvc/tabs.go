@@ -43,6 +43,15 @@ type tab struct {
 	// opens them (actions.go). nil if the tab has none.
 	actions []action
 
+	// own are actions of the tab itself, not of a row, e.g. running a new
+	// pod: the tab's button (ownButton, e.g. "+ run") or KeyOwn opens them.
+	// ownTitle heads their list ("Run a pod"), and ownTarget is what they
+	// are for (the namespace, "default").
+	own       []action
+	ownButton string
+	ownTitle  string
+	ownTarget string
+
 	// autoRefresh is whether the refresh timer reloads the tab. A tab that
 	// isn't auto refreshed is loaded the first time it is opened, and again
 	// when its wide setting changes; it has no refresh button.
@@ -63,6 +72,10 @@ func allTabs() []tab {
 			name:        tabPods,
 			load:        loadPods,
 			command:     "kubectl get pods --all-namespaces",
+			own:         runPodActions(),
+			ownButton:   "+ run",
+			ownTitle:    "Run a pod",
+			ownTarget:   runNamespace,
 			autoRefresh: true,
 		},
 		{
@@ -95,7 +108,7 @@ func (m Model) kubectlCommand() string {
 	switch m.overlay {
 	case overlayActions:
 		a := m.actions()[m.overlayCursor]
-		return a.commandFor(m.target, "", a.flags)
+		return a.commandFor(m.target, a.inputDefault, a.flags)
 	case overlayConfirm, overlayText:
 		return m.chosen().commandFor(m.target, m.input, m.flags)
 	}

@@ -22,6 +22,10 @@ const (
 	// Search the list of the tab on screen
 	KeySearch = "/"
 
+	// The tab's own actions, e.g. run a new pod on Pods: the "+" of its
+	// "+ run" button, as "/" is the key of "/ search"
+	KeyOwn = "+"
+
 	// Delete the last letter typed in a text field
 	KeyBackspace = "backspace"
 

@@ -117,8 +117,14 @@ func (m Model) confirmRows() (rows []string, cursor int) {
 func (m Model) overlayTitle() string {
 	switch m.overlay {
 	case overlayActions:
+		if m.tabActions {
+			return m.activeTab().ownTitle + " in " + m.target // e.g. "Run a pod in default"
+		}
 		return "Actions: " + m.target
 	case overlayConfirm, overlayText:
+		if m.tabActions {
+			return m.chosen().name + " in " + m.target
+		}
 		return m.chosen().name + " " + m.target
 	}
 	return ""
@@ -154,6 +160,9 @@ func (m Model) helpText() string {
 	help := "tab focus • ←→ tab • ↑↓ move"
 	if len(m.actions()) > 0 {
 		help += " • enter actions"
+	}
+	if t := m.activeTab(); len(t.own) > 0 {
+		help += " • " + t.ownButton // e.g. "+ run": its key, then what it does
 	}
 	return help + " • w wide • r refresh • q quit"
 }

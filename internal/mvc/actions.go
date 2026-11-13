@@ -75,11 +75,17 @@ type action struct {
 
 	// input names the text field of an action that needs something typed,
 	// e.g. "labels" for Label, where "env=prod" is typed. "" for none.
-	input string
+	// inputDefault is what is in the field to begin with, to be changed.
+	input        string
+	inputDefault string
+
+	// inputArgs is how what was typed is written in the command, e.g.
+	// "db postgres" as "db --image=postgres". nil writes it as typed.
+	inputArgs func(input string) string
 
 	// command is the kubectl command, with %s where the row's name goes,
-	// e.g. "kubectl cordon %s". What was typed and the ticked flags are
-	// added after it.
+	// e.g. "kubectl cordon %s". What was typed goes where {input} is, or
+	// after the command if there is no {input}; the ticked flags go last.
 	command string
 
 	// run does the action to target with what was typed and the given
@@ -90,8 +96,15 @@ type action struct {
 // commandFor is the kubectl command for running a on target with input
 // and flags, e.g. "kubectl label node worker1 env=prod --overwrite".
 func (a action) commandFor(target, input string, flags []flag) string {
-	parts := []string{fmt.Sprintf(a.command, target)}
-	if input = strings.TrimSpace(input); input != "" {
+	if input = strings.TrimSpace(input); input != "" && a.inputArgs != nil {
+		input = a.inputArgs(input)
+	}
+	cmd := fmt.Sprintf(a.command, target)
+	if strings.Contains(cmd, inputHere) {
+		cmd, input = strings.ReplaceAll(cmd, inputHere, input), ""
+	}
+	parts := strings.Fields(cmd) // no double space where {input} was empty
+	if input != "" {
 		parts = append(parts, input)
 	}
 	for _, f := range flags {
@@ -101,6 +114,9 @@ func (a action) commandFor(target, input string, flags []flag) string {
 	}
 	return strings.Join(parts, " ")
 }
+
+// inputHere marks where in an action's command what was typed goes.
+const inputHere = "{input}"
 
 // ticked reports whether the flag called name is ticked.
 func ticked(flags []flag, name string) bool {
@@ -195,8 +211,12 @@ func rowName(row string) string {
 	return ""
 }
 
-// actions are the active tab's actions.
+// actions are the active tab's actions for a row, or while its own action
+// list is open (tabActions), the tab's own actions, e.g. Run on Pods.
 func (m Model) actions() []action {
+	if m.tabActions {
+		return m.activeTab().own
+	}
 	return m.activeTab().actions
 }
 
@@ -215,8 +235,24 @@ func (m Model) canOpenActions() bool {
 // openActions opens the action list for the row the cursor is on.
 func (m Model) openActions() Model {
 	m.target = rowName(m.rows()[m.cursor])
+	m.tabActions = false
 	m.overlay = overlayActions
 	m.overlayCursor = 0
+	return m
+}
+
+// openOwnActions opens the tab's own action list, e.g. the images to run a
+// pod from on Pods. Its target is the tab's ownTarget, e.g. the namespace.
+func (m Model) openOwnActions() Model {
+	t := m.activeTab()
+	if len(t.own) == 0 {
+		return m
+	}
+	m.target = t.ownTarget
+	m.tabActions = true
+	m.overlay = overlayActions
+	m.overlayCursor = 0
+	m.focus = focusList
 	return m
 }
 
@@ -227,7 +263,7 @@ func (m Model) pick(i int) (Model, tea.Cmd) {
 	m.chosenAction = i
 	a := m.chosen()
 	m.flags = append([]flag(nil), a.flags...) // a copy: ticking must not change the table
-	m.input = ""
+	m.input = a.inputDefault
 	if !a.changes && len(a.flags) == 0 && a.input == "" {
 		return m.runChosen()
 	}
@@ -248,6 +284,7 @@ func (m Model) runChosen() (Model, tea.Cmd) {
 	m.notice = "running: " + a.commandFor(m.target, m.input, m.flags)
 	if a.changes {
 		m.overlay = overlayNone // back to the list while it runs
+		m.tabActions = false
 	}
 	if m.client == nil {
 		return m, nil // tests without a cluster
@@ -258,6 +295,7 @@ func (m Model) runChosen() (Model, tea.Cmd) {
 // closeOverlay goes back to the tab's list.
 func (m Model) closeOverlay() Model {
 	m.overlay = overlayNone
+	m.tabActions = false
 	m.focus = focusList
 	return m
 }

@@ -93,6 +93,10 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case KeySearch:
 		return m.startSearch(), nil
 
+	// +: the tab's own actions (e.g. run a pod), same as its "+ run" button.
+	case KeyOwn:
+		return m.openOwnActions(), nil
+
 	// esc: clear the search, if there is one.
 	case KeyEsc:
 		if m.searchText() != "" {
@@ -208,6 +212,8 @@ func (m Model) pressButton() (tea.Model, tea.Cmd) {
 		return m.stepRefresh()
 	case buttonSearch:
 		return m.startSearch(), nil
+	case buttonOwn:
+		return m.openOwnActions(), nil
 	}
 	return m, nil
 }

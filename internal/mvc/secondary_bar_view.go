@@ -23,6 +23,7 @@ const (
 	buttonWide    = "wide"
 	buttonRefresh = "refresh"
 	buttonSearch  = "search"
+	buttonOwn     = "own" // the tab's own actions, e.g. "+ run" on Pods
 )
 
 // searchLabelWidth is the most of the search its button shows.
@@ -70,14 +71,18 @@ func (b button) render(focused bool) string {
 // panelButtons are the buttons on the panel's top border, left to right
 // (same order as systems-programing):
 //
-//	[wide: off] [refresh: 5s] [/ search]
+//	[wide: off] [refresh: 5s] [+ run] [/ search]
 //
 // Each is green when on: wide while the active tab shows its wide columns,
-// refresh while auto refresh runs, search while the list is searched.
+// refresh while auto refresh runs, search while the list is searched. The
+// tab's own button (+ run on Pods) is only on a tab with own actions.
 func (m Model) panelButtons() []button {
 	buttons := []button{m.wideButton()}
 	if m.autoRefreshed() { // a tab that isn't auto refreshed (More) has no refresh button
 		buttons = append(buttons, m.refreshButton())
+	}
+	if t := m.activeTab(); len(t.own) > 0 {
+		buttons = append(buttons, button{name: buttonOwn, label: t.ownButton})
 	}
 	return append(buttons, m.searchButton())
 }

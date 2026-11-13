@@ -2,12 +2,15 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // Pod is one pod, with what `kubectl get pods -o wide` shows of it.
@@ -216,4 +219,37 @@ func conditionTrue(p corev1.Pod, t corev1.PodConditionType) bool {
 		}
 	}
 	return false
+}
+
+// RunPod starts a new pod called name in namespace, with one container from
+// image, like `kubectl run NAME --image=IMAGE -n NAMESPACE`. As with
+// kubectl, the pod gets the label run=NAME and its container the pod's
+// name, and nothing manages it: once deleted, it isn't started again.
+//
+// With dryRun the cluster checks the pod but doesn't create it
+// (`--dry-run=server`).
+func (c *Client) RunPod(ctx context.Context, namespace, name, image string, dryRun bool) error {
+	if errs := validation.IsDNS1123Subdomain(name); len(errs) > 0 {
+		return fmt.Errorf("pod name %q: %s", name, strings.Join(errs, "; "))
+	}
+	if strings.TrimSpace(image) == "" || strings.ContainsAny(image, " \t") {
+		return errors.New("an image is needed, with no spaces, e.g. nginx:latest")
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{"run": name},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{Name: name, Image: image}},
+		},
+	}
+	opts := metav1.CreateOptions{}
+	if dryRun {
+		opts.DryRun = []string{metav1.DryRunAll}
+	}
+	_, err := c.clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
+	return err
 }

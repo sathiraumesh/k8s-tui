@@ -116,6 +116,10 @@ type Model struct {
 	// (search.go).
 	search    map[string]string
 	searching bool
+
+	// tabActions is whether the open action list is the tab's own actions
+	// (tab.own, e.g. Run on Pods) rather than the actions for a row.
+	tabActions bool
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each

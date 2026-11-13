@@ -3,6 +3,7 @@ package mvc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
@@ -66,4 +67,99 @@ func age(t, now time.Time) string {
 		return "<unknown>"
 	}
 	return duration.HumanDuration(now.Sub(t))
+}
+
+// ---------- running a new pod ----------
+
+// runNamespace is where a new pod goes: the tab shows every namespace, and
+// a pod has to be in one.
+const runNamespace = "default"
+
+// podImages are the images offered for a new pod, in the order shown, with
+// the key that picks each. Any other image can be typed (runOtherImage).
+var podImages = []struct{ key, image, about string }{
+	{"n", "nginx:latest", "a web server"},
+	{"b", "busybox:latest", "a small set of shell tools"},
+	{"a", "alpine:latest", "a small Linux with a package manager"},
+	{"u", "ubuntu:latest", "a full Linux with more tools"},
+	{"r", "redis:latest", "an in-memory data store"},
+	{"p", "httpd:latest", "the Apache web server"},
+}
+
+// runPodActions are the Pods tab's own actions: one per image, to run a
+// new pod from it like `kubectl run NAME --image=IMAGE -n default`, and one
+// for any other image. The cluster call is RunPod in internal/kubernetes/pods.go.
+//
+// The name is typed on the confirm page, and starts as the image's name.
+func runPodActions() []action {
+	actions := make([]action, 0, len(podImages)+1)
+	for _, img := range podImages {
+		actions = append(actions, action{
+			key: img.key, name: img.image, about: img.about,
+			changes:      true,
+			input:        "name",
+			inputDefault: imageName(img.image),
+			flags:        []flag{{name: flagDryRun}},
+			command:      "kubectl run " + inputHere + " --image=" + img.image + " -n %s",
+			run: func(c *k8s.Client, namespace, name string, flags []flag) tea.Cmd {
+				name = strings.TrimSpace(name)
+				return change("Run", namespace+"/"+name, flags, func(ctx context.Context) (string, error) {
+					return "", c.RunPod(ctx, namespace, name, img.image, ticked(flags, flagDryRun))
+				})
+			},
+		})
+	}
+	return append(actions, runOtherImage())
+}
+
+// runOtherImage runs a pod from an image that isn't in the list: the name
+// and the image are typed, e.g. "db postgres:16".
+func runOtherImage() action {
+	return action{
+		key: "o", name: "other image", about: "type a name and any image, e.g. db postgres:16",
+		changes:   true,
+		input:     "name and image",
+		inputArgs: runArgs,
+		flags:     []flag{{name: flagDryRun}},
+		command:   "kubectl run " + inputHere + " -n %s",
+		run: func(c *k8s.Client, namespace, input string, flags []flag) tea.Cmd {
+			name, image, ok := splitNameImage(input)
+			return change("Run", namespace+"/"+name, flags, func(ctx context.Context) (string, error) {
+				if !ok {
+					return "", fmt.Errorf("type a name and an image, e.g. db postgres:16")
+				}
+				return "", c.RunPod(ctx, namespace, name, image, ticked(flags, flagDryRun))
+			})
+		},
+	}
+}
+
+// splitNameImage reads "NAME IMAGE", as typed for another image.
+func splitNameImage(input string) (name, image string, ok bool) {
+	f := strings.Fields(input)
+	if len(f) != 2 {
+		return "", "", false
+	}
+	return f[0], f[1], true
+}
+
+// runArgs writes "db postgres:16" as kubectl takes it: "db --image=postgres:16".
+// While only the name is typed it is shown as it is.
+func runArgs(input string) string {
+	if name, image, ok := splitNameImage(input); ok {
+		return name + " --image=" + image
+	}
+	return input
+}
+
+// imageName is the name a pod from image starts with: the image's own name,
+// without registry, path, tag or digest, e.g. "nginx" for "docker.io/library/nginx:latest".
+func imageName(image string) string {
+	if i := strings.LastIndex(image, "/"); i >= 0 {
+		image = image[i+1:]
+	}
+	if i := strings.IndexAny(image, ":@"); i >= 0 {
+		image = image[:i]
+	}
+	return image
 }
