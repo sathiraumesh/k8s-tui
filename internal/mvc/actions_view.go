@@ -9,13 +9,18 @@ import (
 // in the same panel as the list, so they get the same scrolling, cut-off
 // rows and borders.
 //
-//	┌─ Cordon worker1 ──────────────────────────────────────────────┐
-//	│ stop new pods from being placed on the node                   │
+//	┌─ Label worker1 ───────────────────────────────────────────────┐
+//	│ set labels (key=value) or remove them (key-), several with …  │
 //	│                                                               │
+//	│ labels: env=prod█                                             │
+//	│                                                               │
+//	│ [ ] --overwrite                                               │
 //	│ [ ] --dry-run=server                                          │
 //	│                                                               │
-//	│ y run • n back                                                │
-//	└─ $ kubectl cordon worker1 ────────────────────────────────────┘
+//	│ This changes the cluster. y run • n back                      │
+//	└─ $ kubectl label node worker1 env=prod ───────────────────────┘
+//
+// The text field is only there for an action that needs something typed.
 
 // panelContent is what the panel shows: the tab's rows, or the open page.
 type panelContent struct {
@@ -61,16 +66,27 @@ func (m Model) actionRows() []string {
 	return alignColumns(cells)
 }
 
-// confirmRows is the confirm page: what the action does, its flags as tick
-// boxes, and how to go on. cursor is the row of the selected flag, or -1 if
-// the action has none.
+// confirmRows is the confirm page: what the action does, its text field,
+// its flags as tick boxes, and how to go on. cursor is the row of the text
+// field or flag the cursor is on, or -1 if the action has neither.
 func (m Model) confirmRows() (rows []string, cursor int) {
 	a := m.chosen()
 	rows = []string{a.about, ""}
 
 	cursor = -1
+	if a.input != "" {
+		caret := ""
+		if m.typing() {
+			caret = "█" // where the next letter goes
+		}
+		cursor = len(rows)
+		rows = append(rows, a.input+": "+m.input+caret, "")
+	}
+
 	if len(m.flags) > 0 {
-		cursor = len(rows) + m.overlayCursor
+		if !m.typing() {
+			cursor = len(rows) + m.overlayCursor - m.fieldRows()
+		}
 		for _, f := range m.flags {
 			box := "[ ]"
 			if f.on {
@@ -115,6 +131,9 @@ func (m Model) helpText() string {
 		}
 		return "↑↓ move • enter pick" + keys + " • esc back"
 	case overlayConfirm:
+		if m.typing() {
+			return "type the " + m.chosen().input + " • backspace delete • enter/↓ flags • esc back"
+		}
 		if m.chosen().changes {
 			return "↑↓ move • space tick • y run • n back"
 		}

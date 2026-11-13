@@ -19,6 +19,9 @@ const (
 	// Go back from a page (action list, flags, text) to the one before
 	KeyEsc = "esc"
 
+	// Delete the last letter typed in a text field
+	KeyBackspace = "backspace"
+
 	// Run / cancel an action that changes the cluster
 	KeyYes = "y"
 	KeyNo  = "n"

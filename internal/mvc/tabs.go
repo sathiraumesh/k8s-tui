@@ -93,9 +93,10 @@ func allTabs() []tab {
 func (m Model) kubectlCommand() string {
 	switch m.overlay {
 	case overlayActions:
-		return m.actions()[m.overlayCursor].commandFor(m.target, m.actions()[m.overlayCursor].flags)
+		a := m.actions()[m.overlayCursor]
+		return a.commandFor(m.target, "", a.flags)
 	case overlayConfirm, overlayText:
-		return m.chosen().commandFor(m.target, m.flags)
+		return m.chosen().commandFor(m.target, m.input, m.flags)
 	}
 	cmd := m.activeTab().command
 	if cmd != "" && m.activeWide() {

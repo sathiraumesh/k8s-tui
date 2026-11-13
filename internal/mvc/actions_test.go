@@ -340,3 +340,148 @@ func TestNodeActionsComplete(t *testing.T) {
 		seen[a.key] = true
 	}
 }
+
+// ---------- actions with a text field: Label and Taint ----------
+
+var backspaceKey = tea.KeyMsg{Type: tea.KeyBackspace}
+
+// typeText types s into the text field one key at a time, as a person would.
+func typeText(t *testing.T, m Model, s string) Model {
+	t.Helper()
+	for _, r := range s {
+		k := key(string(r))
+		if r == ' ' {
+			k = spaceKey
+		}
+		m = press(t, m, k)
+	}
+	return m
+}
+
+// The cursor starts in the text field, where every letter types, even the
+// ones that are keys elsewhere (q, y, n, j, k).
+func TestTypingInTextField(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("l"))
+	if !m.typing() {
+		t.Fatal("cursor not in the text field on the Label page")
+	}
+	next, cmd := m.Update(key("q"))
+	if cmd != nil {
+		t.Fatal("q quit while typing")
+	}
+	m = typeText(t, next.(Model), "ynjk env=prod")
+	m = press(t, m, backspaceKey)
+	if m.input != "qynjk env=pro" {
+		t.Errorf("input = %q", m.input)
+	}
+	if m.kubectlCommand() != "kubectl label node worker2 qynjk env=pro" {
+		t.Errorf("command = %q", m.kubectlCommand())
+	}
+}
+
+// Pasted text is added in one go.
+func TestPasteInTextField(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("l"), tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("env=prod team=a"), Paste: true})
+	if m.input != "env=prod team=a" {
+		t.Errorf("input = %q", m.input)
+	}
+}
+
+// enter leaves the field for the flags; ↑ goes back to it. Space then ticks
+// the flag under the cursor, not the one above it.
+func TestTextFieldToFlags(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("l")), "env=prod")
+	m = press(t, m, enterKey, down, spaceKey) // to --overwrite, then --dry-run=server
+	if m.typing() || !ticked(m.flags, flagDryRun) || ticked(m.flags, flagOverwrite) {
+		t.Errorf("typing = %v, flags = %+v, want only --dry-run=server ticked", m.typing(), m.flags)
+	}
+	if m.kubectlCommand() != "kubectl label node worker2 env=prod --dry-run=server" {
+		t.Errorf("command = %q", m.kubectlCommand())
+	}
+	m = press(t, m, up, up)
+	if !m.typing() {
+		t.Error("↑ from the first flag didn't go back to the text field")
+	}
+}
+
+// y with nothing typed doesn't run: it asks for the labels.
+func TestEmptyTextFieldDoesNotRun(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = press(t, m, enterKey, key("l"), enterKey)
+	next, cmd := m.Update(key("y"))
+	m = next.(Model)
+	if cmd != nil || m.overlay != overlayConfirm || m.notice != "type the labels first" || !m.typing() {
+		t.Errorf("cmd = %v, overlay = %d, notice = %q, typing = %v", cmd != nil, m.overlay, m.notice, m.typing())
+	}
+}
+
+// Picking an action again starts with an empty field.
+func TestTextFieldClearedOnPick(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("l")), "env=prod")
+	m = press(t, m, escKey, key("t"))
+	if m.input != "" {
+		t.Errorf("input = %q on a newly picked action, want empty", m.input)
+	}
+}
+
+func TestLabelRuns(t *testing.T) {
+	m, cs := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("l")), "env=prod")
+	_, cmd := press(t, m, enterKey).Update(key("y"))
+	m = run(t, m, cmd)
+	if m.notice != "Label worker2: done" {
+		t.Errorf("notice = %q", m.notice)
+	}
+	n, _ := cs.CoreV1().Nodes().Get(context.Background(), "worker2", metav1.GetOptions{})
+	if n.Labels["env"] != "prod" {
+		t.Errorf("labels = %v, want env=prod", n.Labels)
+	}
+}
+
+func TestTaintRuns(t *testing.T) {
+	m, cs := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("t")), "gpu=yes:NoSchedule")
+	_, cmd := press(t, m, enterKey).Update(key("y"))
+	m = run(t, m, cmd)
+	if m.notice != "Taint worker2: done" {
+		t.Errorf("notice = %q", m.notice)
+	}
+	n, _ := cs.CoreV1().Nodes().Get(context.Background(), "worker2", metav1.GetOptions{})
+	if len(n.Spec.Taints) != 1 || n.Spec.Taints[0].ToString() != "gpu=yes:NoSchedule" {
+		t.Errorf("taints = %v", n.Spec.Taints)
+	}
+}
+
+// A bad taint comes back as a failed notice, and the cluster is unchanged.
+func TestBadTaintFails(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("t")), "gpu=yes")
+	_, cmd := press(t, m, enterKey).Update(key("y"))
+	m = run(t, m, cmd)
+	if !strings.HasPrefix(m.notice, "Taint worker2 failed:") {
+		t.Errorf("notice = %q", m.notice)
+	}
+}
+
+func TestViewTextField(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("l")), "env=prod")
+	out := m.View()
+	for _, want := range []string{"labels: env=prod█", "[ ] --overwrite", "[ ] --dry-run=server", "type the labels"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Label page is missing %q:\n%s", want, out)
+		}
+	}
+	if _, bottom := topAndBottom(t, m); !strings.Contains(bottom, "kubectl label node worker2 env=prod") {
+		t.Errorf("bottom border = %q", bottom)
+	}
+	// On the flags the caret goes and the help line is the confirm one.
+	m = press(t, m, enterKey)
+	if strings.Contains(m.View(), "█") || !strings.Contains(m.helpText(), "y run") {
+		t.Errorf("after enter: caret still shown or help = %q", m.helpText())
+	}
+}

@@ -81,13 +81,16 @@ type Model struct {
 	target string
 
 	// overlayCursor is the selected line of the open page: an action in the
-	// action list, or a flag on the confirm page.
+	// action list, or on the confirm page the text field (row 0, if the
+	// action has one) or a flag.
 	overlayCursor int
 
 	// chosenAction is the index of the action picked from the action list,
-	// and flags are its flags as ticked on the confirm page.
+	// flags are its flags as ticked on the confirm page, and input is what
+	// was typed in its text field, e.g. "env=prod".
 	chosenAction int
 	flags        []flag
+	input        string
 
 	// text is the lines of the text page (what a read action returned), and
 	// textOffset how far it is scrolled down.

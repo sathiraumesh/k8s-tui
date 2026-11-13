@@ -16,6 +16,7 @@ import (
 // its entry in allTabs, so adding an action is one entry in a table.
 //
 //	list ──enter──▶ actions ──enter / key──▶ confirm ──y / enter──▶ run
+//	                                         (type, tick flags)
 //	                                                               │
 //	                         a change: back to the list, reloaded ◀┤
 //	                         a read: a page of text (Describe)    ◀┘
@@ -52,19 +53,27 @@ type action struct {
 
 	flags []flag
 
+	// input names the text field of an action that needs something typed,
+	// e.g. "labels" for Label, where "env=prod" is typed. "" for none.
+	input string
+
 	// command is the kubectl command, with %s where the row's name goes,
-	// e.g. "kubectl cordon %s". Ticked flags are added after it.
+	// e.g. "kubectl cordon %s". What was typed and the ticked flags are
+	// added after it.
 	command string
 
-	// run does the action to target with the given flags. It sends an
-	// actionDoneMsg when it is done.
-	run func(c *k8s.Client, target string, flags []flag) tea.Cmd
+	// run does the action to target with what was typed and the given
+	// flags. It sends an actionDoneMsg when it is done.
+	run func(c *k8s.Client, target, input string, flags []flag) tea.Cmd
 }
 
-// commandFor is the kubectl command for running a on target with flags,
-// e.g. "kubectl cordon worker1 --dry-run=server".
-func (a action) commandFor(target string, flags []flag) string {
+// commandFor is the kubectl command for running a on target with input
+// and flags, e.g. "kubectl label node worker1 env=prod --overwrite".
+func (a action) commandFor(target, input string, flags []flag) string {
 	parts := []string{fmt.Sprintf(a.command, target)}
+	if input = strings.TrimSpace(input); input != "" {
+		parts = append(parts, input)
+	}
 	for _, f := range flags {
 		if f.on {
 			parts = append(parts, f.name)
@@ -150,7 +159,8 @@ func (m Model) pick(i int) (Model, tea.Cmd) {
 	m.chosenAction = i
 	a := m.chosen()
 	m.flags = append([]flag(nil), a.flags...) // a copy: ticking must not change the table
-	if !a.changes && len(a.flags) == 0 {
+	m.input = ""
+	if !a.changes && len(a.flags) == 0 && a.input == "" {
 		return m.runChosen()
 	}
 	m.overlay = overlayConfirm
@@ -158,17 +168,23 @@ func (m Model) pick(i int) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// runChosen runs the chosen action with the ticked flags.
+// runChosen runs the chosen action with what was typed and the ticked
+// flags. An action with a text field doesn't run while it is empty.
 func (m Model) runChosen() (Model, tea.Cmd) {
 	a := m.chosen()
-	m.notice = "running: " + a.commandFor(m.target, m.flags)
+	if a.input != "" && strings.TrimSpace(m.input) == "" {
+		m.notice = "type the " + a.input + " first"
+		m.overlayCursor = 0 // on the text field
+		return m, nil
+	}
+	m.notice = "running: " + a.commandFor(m.target, m.input, m.flags)
 	if a.changes {
 		m.overlay = overlayNone // back to the list while it runs
 	}
 	if m.client == nil {
 		return m, nil // tests without a cluster
 	}
-	return m, a.run(m.client, m.target, m.flags)
+	return m, a.run(m.client, m.target, m.input, m.flags)
 }
 
 // closeOverlay goes back to the tab's list.
@@ -201,9 +217,50 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// fieldRows is the number of rows the chosen action's text field takes in
+// the confirm page's cursor: 1 if it has one, else 0. The flags come after.
+func (m Model) fieldRows() int {
+	if m.chosen().input != "" {
+		return 1
+	}
+	return 0
+}
+
+// typing reports whether the cursor is in the confirm page's text field.
+// Keys then type, so q, y, n and the vim keys are letters there.
+func (m Model) typing() bool {
+	return m.overlay == overlayConfirm && m.fieldRows() == 1 && m.overlayCursor == 0
+}
+
+// onFieldKey handles a key while the cursor is in the text field: letters
+// (and pasted text) are added, backspace deletes the last one, and enter,
+// tab or ↓ go on to the flags.
+func (m Model) onFieldKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyRunes, tea.KeySpace:
+		m.input += string(msg.Runes)
+	case tea.KeyBackspace:
+		if r := []rune(m.input); len(r) > 0 {
+			m.input = string(r[:len(r)-1])
+		}
+	case tea.KeyEnter, tea.KeyTab, tea.KeyDown:
+		m.overlayCursor = min(1, len(m.flags)) // the first flag, if any
+	case tea.KeyEsc:
+		m.overlay = overlayActions
+		m.overlayCursor = m.chosenAction
+	case tea.KeyCtrlC:
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
 // onOverlayKey handles a key while a page is open on top of the list.
 // Keys the page doesn't use are ignored, except quit.
-func (m Model) onOverlayKey(key string) (tea.Model, tea.Cmd) {
+func (m Model) onOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.typing() {
+		return m.onFieldKey(msg)
+	}
+	key := msg.String()
 	if key == KeyQuit || key == KeyCtrlC {
 		return m, tea.Quit
 	}
@@ -233,10 +290,10 @@ func (m Model) onOverlayKey(key string) (tea.Model, tea.Cmd) {
 		case KeyUp, KeyK:
 			m.overlayCursor = max(m.overlayCursor-1, 0)
 		case KeyDown, KeyJ:
-			m.overlayCursor = min(m.overlayCursor+1, max(len(m.flags)-1, 0))
+			m.overlayCursor = min(m.overlayCursor+1, max(m.fieldRows()+len(m.flags)-1, 0))
 		case KeySpace:
-			if len(m.flags) > 0 {
-				m.flags[m.overlayCursor].on = !m.flags[m.overlayCursor].on
+			if i := m.overlayCursor - m.fieldRows(); i >= 0 && i < len(m.flags) {
+				m.flags[i].on = !m.flags[i].on
 			}
 		case KeyYes:
 			if a.changes {

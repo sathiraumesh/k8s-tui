@@ -49,7 +49,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		m.notice = "" // a key press clears the last action's message
 		if m.overlay != overlayNone {
-			return m.onOverlayKey(msg.String())
+			return m.onOverlayKey(msg)
 		}
 		return m.onKey(msg)
 	}

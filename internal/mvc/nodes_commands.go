@@ -88,6 +88,10 @@ func alignColumns(rows [][]string) []string {
 // flagNoEvents leaves the events out of Describe.
 const flagNoEvents = "--show-events=false"
 
+// flagOverwrite lets Label and Taint replace a label's value, or a taint
+// with the same key and effect, that the node already has.
+const flagOverwrite = "--overwrite"
+
 // nodeActions are the actions of the Nodes tab: enter on a node opens them.
 // The cluster calls they make are in internal/kubernetes/nodes.go.
 func nodeActions() []action {
@@ -96,7 +100,7 @@ func nodeActions() []action {
 			key: "d", name: "Describe", about: "everything about the node, like kubectl describe",
 			flags:   []flag{{name: flagNoEvents}},
 			command: "kubectl describe node %s",
-			run: func(c *k8s.Client, target string, flags []flag) tea.Cmd {
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
 				return read("Describe", target, func(ctx context.Context) (string, error) {
 					return c.DescribeNode(ctx, target, !ticked(flags, flagNoEvents))
 				})
@@ -107,7 +111,7 @@ func nodeActions() []action {
 			changes: true,
 			flags:   []flag{{name: flagDryRun}},
 			command: "kubectl cordon %s",
-			run: func(c *k8s.Client, target string, flags []flag) tea.Cmd {
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
 				return change("Cordon", target, flags, func(ctx context.Context) error {
 					return c.Cordon(ctx, target, ticked(flags, flagDryRun))
 				})
@@ -118,9 +122,33 @@ func nodeActions() []action {
 			changes: true,
 			flags:   []flag{{name: flagDryRun}},
 			command: "kubectl uncordon %s",
-			run: func(c *k8s.Client, target string, flags []flag) tea.Cmd {
+			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
 				return change("Uncordon", target, flags, func(ctx context.Context) error {
 					return c.Uncordon(ctx, target, ticked(flags, flagDryRun))
+				})
+			},
+		},
+		{
+			key: "l", name: "Label", about: "set labels (key=value) or remove them (key-), several with spaces",
+			changes: true,
+			input:   "labels",
+			flags:   []flag{{name: flagOverwrite}, {name: flagDryRun}},
+			command: "kubectl label node %s",
+			run: func(c *k8s.Client, target, input string, flags []flag) tea.Cmd {
+				return change("Label", target, flags, func(ctx context.Context) error {
+					return c.Label(ctx, target, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
+				})
+			},
+		},
+		{
+			key: "t", name: "Taint", about: "add taints (key=value:NoSchedule) or remove them (key:NoSchedule- or key-)",
+			changes: true,
+			input:   "taints",
+			flags:   []flag{{name: flagOverwrite}, {name: flagDryRun}},
+			command: "kubectl taint node %s",
+			run: func(c *k8s.Client, target, input string, flags []flag) tea.Cmd {
+				return change("Taint", target, flags, func(ctx context.Context) error {
+					return c.Taint(ctx, target, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
 				})
 			},
 		},

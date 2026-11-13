@@ -2,7 +2,9 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -10,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubectl/pkg/describe"
 )
 
@@ -142,4 +145,194 @@ func (c *Client) setUnschedulable(ctx context.Context, name string, unschedulabl
 func (c *Client) DescribeNode(_ context.Context, name string, showEvents bool) (string, error) {
 	d := &describe.NodeDescriber{Interface: c.clientset}
 	return d.Describe("", name, describe.DescriberSettings{ShowEvents: showEvents, ChunkSize: 500})
+}
+
+// Label sets and removes labels on the node, like
+// `kubectl label node NAME env=prod old-`. Each change is one of:
+//
+//	key=value   set the label
+//	key-        remove it
+//
+// A label that already has a different value is only changed with
+// overwrite (`--overwrite`), and with dryRun the cluster checks the change
+// but doesn't save it (`--dry-run=server`).
+func (c *Client) Label(ctx context.Context, name string, changes []string, overwrite, dryRun bool) error {
+	set, remove, err := parseLabels(changes)
+	if err != nil {
+		return err
+	}
+	return c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
+		for _, l := range set {
+			if old, ok := n.Labels[l.key]; ok && old != l.value && !overwrite {
+				return fmt.Errorf("label %q already has a value (%s), and --overwrite is false", l.key, old)
+			}
+		}
+		if n.Labels == nil {
+			n.Labels = map[string]string{}
+		}
+		for _, l := range set {
+			n.Labels[l.key] = l.value
+		}
+		for _, key := range remove {
+			delete(n.Labels, key) // like kubectl, removing a label that isn't there is fine
+		}
+		return nil
+	})
+}
+
+// label is one key=value to set.
+type label struct{ key, value string }
+
+// parseLabels splits label changes into the labels to set and the keys to
+// remove, checking each the way the API server would.
+func parseLabels(changes []string) (set []label, remove []string, err error) {
+	if len(changes) == 0 {
+		return nil, nil, errors.New("no labels given: key=value sets one, key- removes it")
+	}
+	for _, ch := range changes {
+		// "=" first: kubectl reads "a=b-" as a value, not a removal.
+		if key, value, ok := strings.Cut(ch, "="); ok {
+			if err := checkKey(key); err != nil {
+				return nil, nil, err
+			}
+			if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+				return nil, nil, fmt.Errorf("label value %q: %s", value, strings.Join(errs, "; "))
+			}
+			set = append(set, label{key, value})
+			continue
+		}
+		key, ok := strings.CutSuffix(ch, "-")
+		if !ok {
+			return nil, nil, fmt.Errorf("%q: want key=value to set a label, or key- to remove it", ch)
+		}
+		if err := checkKey(key); err != nil {
+			return nil, nil, err
+		}
+		remove = append(remove, key)
+	}
+	for _, l := range set {
+		if slices.Contains(remove, l.key) {
+			return nil, nil, fmt.Errorf("label %q is both set and removed", l.key)
+		}
+	}
+	return set, remove, nil
+}
+
+// Taint adds and removes taints on the node, like
+// `kubectl taint node NAME key=value:NoSchedule other:NoExecute-`. A taint
+// keeps pods off the node unless they tolerate it. Each change is one of:
+//
+//	key=value:Effect   add a taint (the value can be left out: key:Effect)
+//	key:Effect-        remove the key's taint with that effect
+//	key-               remove all of the key's taints
+//
+// Effect is NoSchedule, PreferNoSchedule or NoExecute. A taint with the
+// same key and effect as one the node has is only replaced with overwrite
+// (`--overwrite`); dryRun is `--dry-run=server`.
+func (c *Client) Taint(ctx context.Context, name string, changes []string, overwrite, dryRun bool) error {
+	add, remove, err := parseTaints(changes)
+	if err != nil {
+		return err
+	}
+	return c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
+		for _, r := range remove {
+			var kept []corev1.Taint
+			for _, t := range n.Spec.Taints {
+				if t.Key != r.Key || (r.Effect != "" && t.Effect != r.Effect) {
+					kept = append(kept, t)
+				}
+			}
+			if len(kept) == len(n.Spec.Taints) {
+				return fmt.Errorf("taint %q not found", r.ToString())
+			}
+			n.Spec.Taints = kept
+		}
+		for _, a := range add {
+			i := slices.IndexFunc(n.Spec.Taints, func(t corev1.Taint) bool { return t.MatchTaint(&a) }) // same key and effect
+			switch {
+			case i < 0:
+				n.Spec.Taints = append(n.Spec.Taints, a)
+			case !overwrite:
+				return fmt.Errorf("node %s already has a %q taint with effect %s, and --overwrite is false", name, a.Key, a.Effect)
+			default:
+				n.Spec.Taints[i] = a
+			}
+		}
+		return nil
+	})
+}
+
+// parseTaints splits taint changes into the taints to add and the ones to
+// remove. A taint to remove may have no effect: then it means every effect.
+func parseTaints(changes []string) (add, remove []corev1.Taint, err error) {
+	if len(changes) == 0 {
+		return nil, nil, errors.New("no taints given: key=value:Effect adds one, key:Effect- removes it")
+	}
+	for _, ch := range changes {
+		spec, removing := strings.CutSuffix(ch, "-")
+		t, err := parseTaint(spec, removing)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%q: %w", ch, err)
+		}
+		if removing {
+			remove = append(remove, t)
+		} else {
+			add = append(add, t)
+		}
+	}
+	return add, remove, nil
+}
+
+// parseTaint reads one taint, "key[=value][:Effect]". The effect may only
+// be left out of a taint that is being removed.
+func parseTaint(spec string, removing bool) (corev1.Taint, error) {
+	keyValue, effect, hasEffect := strings.Cut(spec, ":")
+	key, value, _ := strings.Cut(keyValue, "=")
+	t := corev1.Taint{Key: key, Value: value, Effect: corev1.TaintEffect(effect)}
+
+	if err := checkKey(key); err != nil {
+		return t, err
+	}
+	if errs := validation.IsValidLabelValue(value); len(errs) > 0 {
+		return t, fmt.Errorf("taint value %q: %s", value, strings.Join(errs, "; "))
+	}
+	switch {
+	case !hasEffect && !removing:
+		return t, errors.New("want key=value:Effect, the effect is NoSchedule, PreferNoSchedule or NoExecute")
+	case hasEffect && !slices.Contains(taintEffects, t.Effect):
+		return t, fmt.Errorf("unknown effect %q, want NoSchedule, PreferNoSchedule or NoExecute", effect)
+	}
+	return t, nil
+}
+
+// taintEffects are the effects a taint can have.
+var taintEffects = []corev1.TaintEffect{corev1.TaintEffectNoSchedule, corev1.TaintEffectPreferNoSchedule, corev1.TaintEffectNoExecute}
+
+// checkKey checks a label or taint key, e.g. "env" or "example.com/env".
+func checkKey(key string) error {
+	if errs := validation.IsQualifiedName(key); len(errs) > 0 {
+		return fmt.Errorf("key %q: %s", key, strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+// updateNode reads the node, lets change edit it, and saves it: a GET then
+// a PUT, which is what kubectl label and kubectl taint do. If the node
+// changed in between, the PUT fails with a conflict instead of undoing
+// the other change.
+func (c *Client) updateNode(ctx context.Context, name string, dryRun bool, change func(*corev1.Node) error) error {
+	nodes := c.clientset.CoreV1().Nodes()
+	n, err := nodes.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if err := change(n); err != nil {
+		return err
+	}
+	opts := metav1.UpdateOptions{}
+	if dryRun {
+		opts.DryRun = []string{metav1.DryRunAll}
+	}
+	_, err = nodes.Update(ctx, n, opts)
+	return err
 }

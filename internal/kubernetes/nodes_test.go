@@ -273,3 +273,201 @@ func TestDescribeMissingNode(t *testing.T) {
 		t.Error("err = nil, want an error for a node that doesn't exist")
 	}
 }
+
+// ---------- labels and taints ----------
+
+// getNode reads a node back from the fake cluster.
+func getNode(t *testing.T, cs *fake.Clientset, name string) *corev1.Node {
+	t.Helper()
+	n, err := cs.CoreV1().Nodes().Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestLabelSetsAndRemoves(t *testing.T) {
+	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, map[string]string{"old": "x", "keep": "y"}))
+	if err := NewClientFromClientset(cs).Label(context.Background(), "worker1", []string{"env=prod", "example.com/team=a", "old-"}, false, false); err != nil {
+		t.Fatal(err)
+	}
+	got := getNode(t, cs, "worker1").Labels
+	want := map[string]string{"env": "prod", "example.com/team": "a", "keep": "y"}
+	if len(got) != len(want) {
+		t.Fatalf("labels = %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("labels = %v, want %v", got, want)
+		}
+	}
+}
+
+// A node with no labels at all can still be labelled.
+func TestLabelNodeWithoutLabels(t *testing.T) {
+	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, nil))
+	if err := NewClientFromClientset(cs).Label(context.Background(), "worker1", []string{"env=prod"}, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := getNode(t, cs, "worker1").Labels["env"]; got != "prod" {
+		t.Errorf("env = %q, want prod", got)
+	}
+}
+
+// Changing a label's value needs overwrite; setting the same value doesn't.
+func TestLabelOverwrite(t *testing.T) {
+	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, map[string]string{"env": "dev"}))
+	c := NewClientFromClientset(cs)
+	err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, false)
+	if err == nil || !strings.Contains(err.Error(), "--overwrite is false") {
+		t.Errorf("err = %v, want the --overwrite error", err)
+	}
+	if err := c.Label(context.Background(), "worker1", []string{"env=dev"}, false, false); err != nil {
+		t.Errorf("same value: err = %v, want nil", err)
+	}
+	if err := c.Label(context.Background(), "worker1", []string{"env=prod"}, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := getNode(t, cs, "worker1").Labels["env"]; got != "prod" {
+		t.Errorf("env = %q after overwrite, want prod", got)
+	}
+}
+
+func TestParseLabelsErrors(t *testing.T) {
+	for _, changes := range [][]string{
+		nil,               // nothing given
+		{"env"},           // neither =value nor -
+		{"bad key=x"},     // space in the key
+		{"=x"},            // no key
+		{"env=a b"},       // space in the value
+		{"env=x", "env-"}, // set and removed
+	} {
+		if _, _, err := parseLabels(changes); err == nil {
+			t.Errorf("parseLabels(%q): err = nil, want an error", changes)
+		}
+	}
+}
+
+// taintsOf is the node's taints written like kubectl takes them.
+func taintsOf(t *testing.T, cs *fake.Clientset, name string) []string {
+	t.Helper()
+	var out []string
+	for _, taint := range getNode(t, cs, name).Spec.Taints {
+		out = append(out, taint.ToString())
+	}
+	return out
+}
+
+func taintedNode(taints ...corev1.Taint) *corev1.Node {
+	n := fakeNode("worker1", corev1.ConditionTrue, nil)
+	n.Spec.Taints = taints
+	return n
+}
+
+func TestTaintAdds(t *testing.T) {
+	cs := fake.NewClientset(taintedNode())
+	if err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule", "spot:PreferNoSchedule"}, false, false); err != nil {
+		t.Fatal(err)
+	}
+	got := taintsOf(t, cs, "worker1")
+	if !slices.Equal(got, []string{"gpu=yes:NoSchedule", "spot:PreferNoSchedule"}) {
+		t.Errorf("taints = %v", got)
+	}
+}
+
+func TestTaintRemoves(t *testing.T) {
+	start := []corev1.Taint{
+		{Key: "gpu", Value: "yes", Effect: corev1.TaintEffectNoSchedule},
+		{Key: "gpu", Effect: corev1.TaintEffectNoExecute},
+		{Key: "spot", Effect: corev1.TaintEffectPreferNoSchedule},
+	}
+	for _, tc := range []struct {
+		change string
+		want   []string
+	}{
+		{"gpu:NoSchedule-", []string{"gpu:NoExecute", "spot:PreferNoSchedule"}}, // that effect only
+		{"gpu-", []string{"spot:PreferNoSchedule"}},                             // every effect
+	} {
+		cs := fake.NewClientset(taintedNode(start...))
+		if err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{tc.change}, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if got := taintsOf(t, cs, "worker1"); !slices.Equal(got, tc.want) {
+			t.Errorf("%s: taints = %v, want %v", tc.change, got, tc.want)
+		}
+	}
+}
+
+func TestTaintRemoveMissing(t *testing.T) {
+	cs := fake.NewClientset(taintedNode())
+	err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{"gpu-"}, false, false)
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("err = %v, want not found", err)
+	}
+}
+
+// A taint with the same key and effect is only replaced with overwrite.
+func TestTaintOverwrite(t *testing.T) {
+	cs := fake.NewClientset(taintedNode(corev1.Taint{Key: "gpu", Value: "no", Effect: corev1.TaintEffectNoSchedule}))
+	c := NewClientFromClientset(cs)
+	if err := c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule"}, false, false); err == nil {
+		t.Error("err = nil, want the --overwrite error")
+	}
+	if err := c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule"}, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := taintsOf(t, cs, "worker1"); !slices.Equal(got, []string{"gpu=yes:NoSchedule"}) {
+		t.Errorf("taints = %v, want the value replaced", got)
+	}
+}
+
+func TestParseTaintsErrors(t *testing.T) {
+	for _, changes := range [][]string{
+		nil,                   // nothing given
+		{"gpu=yes"},           // adding needs an effect
+		{"gpu=yes:Sometimes"}, // unknown effect
+		{"bad key:NoSchedule"},
+		{"gpu=a b:NoSchedule"},
+	} {
+		if _, _, err := parseTaints(changes); err == nil {
+			t.Errorf("parseTaints(%q): err = nil, want an error", changes)
+		}
+	}
+}
+
+// Label and taint read the node and save it back with an update, with the
+// dry-run option only when asked for. A bad change sends nothing.
+func TestLabelAndTaintUpdate(t *testing.T) {
+	for _, dryRun := range []bool{false, true} {
+		cs := fake.NewClientset(taintedNode())
+		var updates []k8stesting.UpdateActionImpl
+		cs.PrependReactor("update", "nodes", func(a k8stesting.Action) (bool, runtime.Object, error) {
+			updates = append(updates, a.(k8stesting.UpdateActionImpl))
+			return false, nil, nil
+		})
+		c := NewClientFromClientset(cs)
+		if err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, dryRun); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.Taint(context.Background(), "worker1", []string{"gpu:NoSchedule"}, false, dryRun); err != nil {
+			t.Fatal(err)
+		}
+		c.Label(context.Background(), "worker1", []string{"bad key=x"}, false, dryRun)
+		if len(updates) != 2 {
+			t.Fatalf("dryRun=%v: %d updates, want 2", dryRun, len(updates))
+		}
+		for _, u := range updates {
+			isDryRun := len(u.UpdateOptions.DryRun) == 1 && u.UpdateOptions.DryRun[0] == metav1.DryRunAll
+			if isDryRun != dryRun {
+				t.Errorf("dryRun=%v: update options = %+v", dryRun, u.UpdateOptions)
+			}
+		}
+	}
+}
+
+func TestLabelMissingNode(t *testing.T) {
+	err := NewClientFromClientset(fake.NewClientset()).Label(context.Background(), "nope", []string{"env=prod"}, false, false)
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("err = %v, want not found", err)
+	}
+}
