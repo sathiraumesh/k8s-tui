@@ -3,6 +3,7 @@ package mvc
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	k8s "k8s-tui/internal/kubernetes"
@@ -19,6 +20,7 @@ import (
 //	                                         (type, tick flags)
 //	                                                               │
 //	                         a change: back to the list, reloaded ◀┤
+//	                         a dry run: what it would change      ◀┤
 //	                         a read: a page of text (Describe)    ◀┘
 //
 // How the pages are drawn is in actions_view.go.
@@ -108,13 +110,43 @@ func read(name, target string, get func(context.Context) (string, error)) tea.Cm
 }
 
 // change returns the command for an action that changes the cluster: it
-// runs do and reports whether it worked.
-func change(name, target string, flags []flag, do func(context.Context) error) tea.Cmd {
+// runs do and reports whether it worked. do may also return a text of what
+// changed (see changeText); after a dry run it is shown on a page.
+func change(name, target string, flags []flag, do func(context.Context) (string, error)) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()
-		return actionDoneMsg{action: name, target: target, changed: true, dryRun: ticked(flags, flagDryRun), err: do(ctx)}
+		text, err := do(ctx)
+		return actionDoneMsg{action: name, target: target, changed: true, dryRun: ticked(flags, flagDryRun), text: text, err: err}
 	}
+}
+
+// changeText shows what a change does to a list, e.g. a node's labels:
+// every item after it, "+" for the new ones, then "-" for the removed ones.
+//
+//	Labels after the change:
+//
+//	+ env=prod
+//	  kubernetes.io/os=linux
+//	- old=x
+func changeText(title string, before, after []string) string {
+	lines := []string{title + " after the change:", ""}
+	for _, s := range after {
+		mark := "  "
+		if !slices.Contains(before, s) {
+			mark = "+ "
+		}
+		lines = append(lines, mark+s)
+	}
+	for _, s := range before {
+		if !slices.Contains(after, s) {
+			lines = append(lines, "- "+s)
+		}
+	}
+	if len(before) == 0 && len(after) == 0 {
+		lines = append(lines, "(none)")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // ---------- the model's side ----------
@@ -203,18 +235,26 @@ func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
 	case msg.err != nil:
 		m.notice = what + " failed: " + msg.err.Error()
 		return m, nil
+	case msg.changed && msg.dryRun:
+		m.notice = what + ": dry run passed, nothing changed"
+		if msg.text != "" {
+			m = m.showText(msg.text) // what it would change
+		}
+		return m, nil // nothing changed, so nothing to reload
 	case msg.changed:
 		m.notice = what + ": done"
-		if msg.dryRun {
-			m.notice = what + ": dry run passed, nothing changed"
-		}
 		return m, m.loadActive()
 	}
-	m.overlay = overlayText
-	m.text = strings.Split(strings.TrimRight(msg.text, "\n"), "\n")
-	m.textOffset = 0
 	m.notice = ""
-	return m, nil
+	return m.showText(msg.text), nil
+}
+
+// showText opens the text page with text, scrolled to the top.
+func (m Model) showText(text string) Model {
+	m.overlay = overlayText
+	m.text = strings.Split(strings.TrimRight(text, "\n"), "\n")
+	m.textOffset = 0
+	return m
 }
 
 // fieldRows is the number of rows the chosen action's text field takes in

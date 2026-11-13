@@ -93,7 +93,10 @@ func TestRowName(t *testing.T) {
 
 func TestActionListMovesAndCloses(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m = press(t, m, enterKey, down, down, down, down)
+	m = press(t, m, enterKey)
+	for range nodeActions() { // one more ↓ than needed: stops on the last
+		m = press(t, m, down)
+	}
 	if m.overlayCursor != len(nodeActions())-1 {
 		t.Errorf("cursor = %d, want the last action", m.overlayCursor)
 	}
@@ -135,7 +138,7 @@ func TestSpaceTicksFlag(t *testing.T) {
 		t.Errorf("command = %q, want the dry-run flag added", m.kubectlCommand())
 	}
 	// Ticking must not change the action's defaults.
-	if nodeActions()[1].flags[0].on {
+	if nodeActions()[2].flags[0].on {
 		t.Error("ticking changed the action table's default")
 	}
 }
@@ -156,7 +159,7 @@ func TestEnterDoesNotRunChange(t *testing.T) {
 func TestNGoesBackToActions(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = press(t, m, enterKey, key("c"), key("n"))
-	if m.overlay != overlayActions || m.overlayCursor != 1 {
+	if m.overlay != overlayActions || m.chosen().name != "Cordon" || m.overlayCursor != m.chosenAction {
 		t.Errorf("overlay = %d, cursor = %d, want the action list on Cordon", m.overlay, m.overlayCursor)
 	}
 }
@@ -280,7 +283,7 @@ func topAndBottom(t *testing.T, m Model) (top, bottom string) {
 
 func TestViewActionList(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m = press(t, m, enterKey, down) // on Cordon
+	m = press(t, m, enterKey, down, down) // on Cordon
 	out := m.View()
 	for _, want := range []string{"Describe", "Cordon", "Uncordon", "stop new pods"} {
 		if !strings.Contains(out, want) {
@@ -483,5 +486,61 @@ func TestViewTextField(t *testing.T) {
 	m = press(t, m, enterKey)
 	if strings.Contains(m.View(), "█") || !strings.Contains(m.helpText(), "y run") {
 		t.Errorf("after enter: caret still shown or help = %q", m.helpText())
+	}
+}
+
+// ---------- Show, and what a dry run would change ----------
+
+// s shows the node's labels and taints straight away: it has no flags.
+func TestShowLabelsAndTaints(t *testing.T) {
+	m, cs := nodesOnScreen(t)
+	n, _ := cs.CoreV1().Nodes().Get(context.Background(), "worker2", metav1.GetOptions{})
+	n.Labels = map[string]string{"env": "prod"}
+	cs.CoreV1().Nodes().Update(context.Background(), n, metav1.UpdateOptions{})
+
+	next, cmd := press(t, m, enterKey).Update(key("s"))
+	m = run(t, next.(Model), cmd)
+	if m.overlay != overlayText {
+		t.Fatalf("overlay = %d, want the text page", m.overlay)
+	}
+	text := strings.Join(m.text, "\n")
+	for _, want := range []string{"Labels:", "  env=prod", "Taints:", "  (none)"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("Show page is missing %q:\n%s", want, text)
+		}
+	}
+	if m.kubectlCommand() != "kubectl get node worker2 --show-labels" {
+		t.Errorf("command = %q", m.kubectlCommand())
+	}
+}
+
+// A dry run of Label opens a page of what it would change, and doesn't
+// reload the list: nothing changed.
+func TestLabelDryRunShowsChange(t *testing.T) {
+	m, _ := nodesOnScreen(t)
+	m = typeText(t, press(t, m, enterKey, key("l")), "env=prod")
+	m = press(t, m, enterKey, down, spaceKey) // tick --dry-run=server
+	_, cmd := m.Update(key("y"))
+	next, reload := m.Update(cmd())
+	m = next.(Model)
+	if reload != nil {
+		t.Error("a dry run reloaded the list")
+	}
+	if m.overlay != overlayText || !strings.Contains(m.notice, "dry run passed") {
+		t.Fatalf("overlay = %d, notice = %q", m.overlay, m.notice)
+	}
+	if text := strings.Join(m.text, "\n"); !strings.Contains(text, "Labels after the change:") || !strings.Contains(text, "+ env=prod") {
+		t.Errorf("dry run page:\n%s", text)
+	}
+}
+
+func TestChangeText(t *testing.T) {
+	got := changeText("Labels", []string{"keep=1", "old=x"}, []string{"env=prod", "keep=1"})
+	want := "Labels after the change:\n\n+ env=prod\n  keep=1\n- old=x"
+	if got != want {
+		t.Errorf("changeText =\n%s\nwant\n%s", got, want)
+	}
+	if got := changeText("Taints", nil, nil); !strings.HasSuffix(got, "(none)") {
+		t.Errorf("no taints: %q", got)
 	}
 }

@@ -107,13 +107,23 @@ func nodeActions() []action {
 			},
 		},
 		{
+			key: "s", name: "Show", about: "the node's labels and taints",
+			command: "kubectl get node %s --show-labels",
+			run: func(c *k8s.Client, target, _ string, _ []flag) tea.Cmd {
+				return read("Show", target, func(ctx context.Context) (string, error) {
+					labels, taints, err := c.LabelsAndTaints(ctx, target)
+					return labelsAndTaintsText(labels, taints), err
+				})
+			},
+		},
+		{
 			key: "c", name: "Cordon", about: "stop new pods from being placed on the node",
 			changes: true,
 			flags:   []flag{{name: flagDryRun}},
 			command: "kubectl cordon %s",
 			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
-				return change("Cordon", target, flags, func(ctx context.Context) error {
-					return c.Cordon(ctx, target, ticked(flags, flagDryRun))
+				return change("Cordon", target, flags, func(ctx context.Context) (string, error) {
+					return "", c.Cordon(ctx, target, ticked(flags, flagDryRun))
 				})
 			},
 		},
@@ -123,8 +133,8 @@ func nodeActions() []action {
 			flags:   []flag{{name: flagDryRun}},
 			command: "kubectl uncordon %s",
 			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
-				return change("Uncordon", target, flags, func(ctx context.Context) error {
-					return c.Uncordon(ctx, target, ticked(flags, flagDryRun))
+				return change("Uncordon", target, flags, func(ctx context.Context) (string, error) {
+					return "", c.Uncordon(ctx, target, ticked(flags, flagDryRun))
 				})
 			},
 		},
@@ -135,8 +145,9 @@ func nodeActions() []action {
 			flags:   []flag{{name: flagOverwrite}, {name: flagDryRun}},
 			command: "kubectl label node %s",
 			run: func(c *k8s.Client, target, input string, flags []flag) tea.Cmd {
-				return change("Label", target, flags, func(ctx context.Context) error {
-					return c.Label(ctx, target, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
+				return change("Label", target, flags, func(ctx context.Context) (string, error) {
+					ch, err := c.Label(ctx, target, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
+					return changeText("Labels", ch.Before, ch.After), err
 				})
 			},
 		},
@@ -147,10 +158,39 @@ func nodeActions() []action {
 			flags:   []flag{{name: flagOverwrite}, {name: flagDryRun}},
 			command: "kubectl taint node %s",
 			run: func(c *k8s.Client, target, input string, flags []flag) tea.Cmd {
-				return change("Taint", target, flags, func(ctx context.Context) error {
-					return c.Taint(ctx, target, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
+				return change("Taint", target, flags, func(ctx context.Context) (string, error) {
+					ch, err := c.Taint(ctx, target, strings.Fields(input), ticked(flags, flagOverwrite), ticked(flags, flagDryRun))
+					return changeText("Taints", ch.Before, ch.After), err
 				})
 			},
 		},
 	}
+}
+
+// labelsAndTaintsText is the Show page:
+//
+//	Labels:
+//
+//	  env=prod
+//	  kubernetes.io/os=linux
+//
+//	Taints:
+//
+//	  (none)
+func labelsAndTaintsText(labels, taints []string) string {
+	var lines []string
+	for _, part := range []struct {
+		title string
+		items []string
+	}{{"Labels", labels}, {"Taints", taints}} {
+		lines = append(lines, part.title+":", "")
+		if len(part.items) == 0 {
+			lines = append(lines, "  (none)")
+		}
+		for _, item := range part.items {
+			lines = append(lines, "  "+item)
+		}
+		lines = append(lines, "")
+	}
+	return strings.Join(lines, "\n")
 }

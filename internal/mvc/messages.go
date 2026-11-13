@@ -53,7 +53,7 @@ type actionDoneMsg struct {
 	target string // the row it was run on, e.g. "worker1"
 	err    error  // set if it failed
 
-	text    string // what a read action returned, e.g. the Describe text
+	text    string // what a read action returned (the Describe text), or what a dry run would change
 	changed bool   // it was a change: the tab is reloaded to show it
 	dryRun  bool   // it was a change run with --dry-run=server: nothing was saved
 }

@@ -288,7 +288,7 @@ func getNode(t *testing.T, cs *fake.Clientset, name string) *corev1.Node {
 
 func TestLabelSetsAndRemoves(t *testing.T) {
 	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, map[string]string{"old": "x", "keep": "y"}))
-	if err := NewClientFromClientset(cs).Label(context.Background(), "worker1", []string{"env=prod", "example.com/team=a", "old-"}, false, false); err != nil {
+	if _, err := NewClientFromClientset(cs).Label(context.Background(), "worker1", []string{"env=prod", "example.com/team=a", "old-"}, false, false); err != nil {
 		t.Fatal(err)
 	}
 	got := getNode(t, cs, "worker1").Labels
@@ -306,7 +306,7 @@ func TestLabelSetsAndRemoves(t *testing.T) {
 // A node with no labels at all can still be labelled.
 func TestLabelNodeWithoutLabels(t *testing.T) {
 	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, nil))
-	if err := NewClientFromClientset(cs).Label(context.Background(), "worker1", []string{"env=prod"}, false, false); err != nil {
+	if _, err := NewClientFromClientset(cs).Label(context.Background(), "worker1", []string{"env=prod"}, false, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := getNode(t, cs, "worker1").Labels["env"]; got != "prod" {
@@ -318,14 +318,14 @@ func TestLabelNodeWithoutLabels(t *testing.T) {
 func TestLabelOverwrite(t *testing.T) {
 	cs := fake.NewClientset(fakeNode("worker1", corev1.ConditionTrue, map[string]string{"env": "dev"}))
 	c := NewClientFromClientset(cs)
-	err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, false)
+	_, err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, false)
 	if err == nil || !strings.Contains(err.Error(), "--overwrite is false") {
 		t.Errorf("err = %v, want the --overwrite error", err)
 	}
-	if err := c.Label(context.Background(), "worker1", []string{"env=dev"}, false, false); err != nil {
+	if _, err := c.Label(context.Background(), "worker1", []string{"env=dev"}, false, false); err != nil {
 		t.Errorf("same value: err = %v, want nil", err)
 	}
-	if err := c.Label(context.Background(), "worker1", []string{"env=prod"}, true, false); err != nil {
+	if _, err := c.Label(context.Background(), "worker1", []string{"env=prod"}, true, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := getNode(t, cs, "worker1").Labels["env"]; got != "prod" {
@@ -366,7 +366,7 @@ func taintedNode(taints ...corev1.Taint) *corev1.Node {
 
 func TestTaintAdds(t *testing.T) {
 	cs := fake.NewClientset(taintedNode())
-	if err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule", "spot:PreferNoSchedule"}, false, false); err != nil {
+	if _, err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule", "spot:PreferNoSchedule"}, false, false); err != nil {
 		t.Fatal(err)
 	}
 	got := taintsOf(t, cs, "worker1")
@@ -389,7 +389,7 @@ func TestTaintRemoves(t *testing.T) {
 		{"gpu-", []string{"spot:PreferNoSchedule"}},                             // every effect
 	} {
 		cs := fake.NewClientset(taintedNode(start...))
-		if err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{tc.change}, false, false); err != nil {
+		if _, err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{tc.change}, false, false); err != nil {
 			t.Fatal(err)
 		}
 		if got := taintsOf(t, cs, "worker1"); !slices.Equal(got, tc.want) {
@@ -400,7 +400,7 @@ func TestTaintRemoves(t *testing.T) {
 
 func TestTaintRemoveMissing(t *testing.T) {
 	cs := fake.NewClientset(taintedNode())
-	err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{"gpu-"}, false, false)
+	_, err := NewClientFromClientset(cs).Taint(context.Background(), "worker1", []string{"gpu-"}, false, false)
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("err = %v, want not found", err)
 	}
@@ -410,10 +410,10 @@ func TestTaintRemoveMissing(t *testing.T) {
 func TestTaintOverwrite(t *testing.T) {
 	cs := fake.NewClientset(taintedNode(corev1.Taint{Key: "gpu", Value: "no", Effect: corev1.TaintEffectNoSchedule}))
 	c := NewClientFromClientset(cs)
-	if err := c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule"}, false, false); err == nil {
+	if _, err := c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule"}, false, false); err == nil {
 		t.Error("err = nil, want the --overwrite error")
 	}
-	if err := c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule"}, true, false); err != nil {
+	if _, err := c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule"}, true, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := taintsOf(t, cs, "worker1"); !slices.Equal(got, []string{"gpu=yes:NoSchedule"}) {
@@ -446,13 +446,13 @@ func TestLabelAndTaintUpdate(t *testing.T) {
 			return false, nil, nil
 		})
 		c := NewClientFromClientset(cs)
-		if err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, dryRun); err != nil {
+		if _, err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, dryRun); err != nil {
 			t.Fatal(err)
 		}
-		if err := c.Taint(context.Background(), "worker1", []string{"gpu:NoSchedule"}, false, dryRun); err != nil {
+		if _, err := c.Taint(context.Background(), "worker1", []string{"gpu:NoSchedule"}, false, dryRun); err != nil {
 			t.Fatal(err)
 		}
-		c.Label(context.Background(), "worker1", []string{"bad key=x"}, false, dryRun)
+		_, _ = c.Label(context.Background(), "worker1", []string{"bad key=x"}, false, dryRun) // a bad change: nothing must be sent
 		if len(updates) != 2 {
 			t.Fatalf("dryRun=%v: %d updates, want 2", dryRun, len(updates))
 		}
@@ -466,8 +466,48 @@ func TestLabelAndTaintUpdate(t *testing.T) {
 }
 
 func TestLabelMissingNode(t *testing.T) {
-	err := NewClientFromClientset(fake.NewClientset()).Label(context.Background(), "nope", []string{"env=prod"}, false, false)
+	_, err := NewClientFromClientset(fake.NewClientset()).Label(context.Background(), "nope", []string{"env=prod"}, false, false)
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("err = %v, want not found", err)
+	}
+}
+
+// Label and Taint return the labels or taints before and after the change.
+func TestLabelAndTaintReturnChange(t *testing.T) {
+	cs := fake.NewClientset(taintedNode(corev1.Taint{Key: "spot", Effect: corev1.TaintEffectPreferNoSchedule}))
+	c := NewClientFromClientset(cs)
+
+	got, err := c.Label(context.Background(), "worker1", []string{"env=prod"}, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Before) != 0 || !slices.Equal(got.After, []string{"env=prod"}) {
+		t.Errorf("label change = %+v", got)
+	}
+
+	got, err = c.Taint(context.Background(), "worker1", []string{"gpu=yes:NoSchedule", "spot-"}, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.Before, []string{"spot:PreferNoSchedule"}) || !slices.Equal(got.After, []string{"gpu=yes:NoSchedule"}) {
+		t.Errorf("taint change = %+v", got)
+	}
+}
+
+func TestLabelsAndTaints(t *testing.T) {
+	cs := fake.NewClientset(taintedNode(corev1.Taint{Key: "gpu", Value: "yes", Effect: corev1.TaintEffectNoSchedule}))
+	c := NewClientFromClientset(cs)
+	if _, err := c.Label(context.Background(), "worker1", []string{"zone=b", "env=prod"}, false, false); err != nil {
+		t.Fatal(err)
+	}
+	labels, taints, err := c.LabelsAndTaints(context.Background(), "worker1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(labels, []string{"env=prod", "zone=b"}) || !slices.Equal(taints, []string{"gpu=yes:NoSchedule"}) {
+		t.Errorf("labels = %v, taints = %v", labels, taints)
+	}
+	if _, _, err := c.LabelsAndTaints(context.Background(), "nope"); err == nil {
+		t.Error("err = nil for a node that doesn't exist")
 	}
 }

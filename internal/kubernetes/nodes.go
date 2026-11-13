@@ -156,12 +156,15 @@ func (c *Client) DescribeNode(_ context.Context, name string, showEvents bool) (
 // A label that already has a different value is only changed with
 // overwrite (`--overwrite`), and with dryRun the cluster checks the change
 // but doesn't save it (`--dry-run=server`).
-func (c *Client) Label(ctx context.Context, name string, changes []string, overwrite, dryRun bool) error {
+//
+// It returns the node's labels before and after, as key=value. After a dry
+// run, after is what the cluster would have saved.
+func (c *Client) Label(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (NodeChange, error) {
 	set, remove, err := parseLabels(changes)
 	if err != nil {
-		return err
+		return NodeChange{}, err
 	}
-	return c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
+	before, after, err := c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
 		for _, l := range set {
 			if old, ok := n.Labels[l.key]; ok && old != l.value && !overwrite {
 				return fmt.Errorf("label %q already has a value (%s), and --overwrite is false", l.key, old)
@@ -178,6 +181,31 @@ func (c *Client) Label(ctx context.Context, name string, changes []string, overw
 		}
 		return nil
 	})
+	if err != nil {
+		return NodeChange{}, err
+	}
+	return NodeChange{Before: labelStrings(before), After: labelStrings(after)}, nil
+}
+
+// LabelsAndTaints returns the node's labels, as key=value sorted by key, and
+// its taints, as key=value:Effect. The labels are what
+// `kubectl get node NAME --show-labels` shows.
+func (c *Client) LabelsAndTaints(ctx context.Context, name string) (labels, taints []string, err error) {
+	n, err := c.clientset.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	return labelStrings(n), taintStrings(n), nil
+}
+
+// labelStrings is the node's labels as key=value, sorted by key.
+func labelStrings(n *corev1.Node) []string {
+	out := make([]string, 0, len(n.Labels))
+	for k, v := range n.Labels {
+		out = append(out, k+"="+v)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // label is one key=value to set.
@@ -229,12 +257,14 @@ func parseLabels(changes []string) (set []label, remove []string, err error) {
 // Effect is NoSchedule, PreferNoSchedule or NoExecute. A taint with the
 // same key and effect as one the node has is only replaced with overwrite
 // (`--overwrite`); dryRun is `--dry-run=server`.
-func (c *Client) Taint(ctx context.Context, name string, changes []string, overwrite, dryRun bool) error {
+//
+// It returns the node's taints before and after, as key=value:Effect.
+func (c *Client) Taint(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (NodeChange, error) {
 	add, remove, err := parseTaints(changes)
 	if err != nil {
-		return err
+		return NodeChange{}, err
 	}
-	return c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
+	before, after, err := c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
 		for _, r := range remove {
 			var kept []corev1.Taint
 			for _, t := range n.Spec.Taints {
@@ -260,6 +290,19 @@ func (c *Client) Taint(ctx context.Context, name string, changes []string, overw
 		}
 		return nil
 	})
+	if err != nil {
+		return NodeChange{}, err
+	}
+	return NodeChange{Before: taintStrings(before), After: taintStrings(after)}, nil
+}
+
+// taintStrings is the node's taints as key=value:Effect, in the node's order.
+func taintStrings(n *corev1.Node) []string {
+	out := make([]string, 0, len(n.Spec.Taints))
+	for _, t := range n.Spec.Taints {
+		out = append(out, t.ToString())
+	}
+	return out
 }
 
 // parseTaints splits taint changes into the taints to add and the ones to
@@ -316,23 +359,36 @@ func checkKey(key string) error {
 	return nil
 }
 
+// NodeChange is what a change did to a node, or with a dry run would have
+// done: the labels or taints before and after it.
+type NodeChange struct {
+	Before, After []string
+}
+
 // updateNode reads the node, lets change edit it, and saves it: a GET then
 // a PUT, which is what kubectl label and kubectl taint do. If the node
 // changed in between, the PUT fails with a conflict instead of undoing
 // the other change.
-func (c *Client) updateNode(ctx context.Context, name string, dryRun bool, change func(*corev1.Node) error) error {
+//
+// It returns the node as it was read, and as the cluster answered the PUT:
+// as saved, or after a dry run as it would have been saved.
+func (c *Client) updateNode(ctx context.Context, name string, dryRun bool, change func(*corev1.Node) error) (before, after *corev1.Node, err error) {
 	nodes := c.clientset.CoreV1().Nodes()
-	n, err := nodes.Get(ctx, name, metav1.GetOptions{})
+	before, err = nodes.Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	if err := change(n); err != nil {
-		return err
+	edited := before.DeepCopy() // change edits a copy, so before stays as it was
+	if err := change(edited); err != nil {
+		return nil, nil, err
 	}
 	opts := metav1.UpdateOptions{}
 	if dryRun {
 		opts.DryRun = []string{metav1.DryRunAll}
 	}
-	_, err = nodes.Update(ctx, n, opts)
-	return err
+	after, err = nodes.Update(ctx, edited, opts)
+	if err != nil {
+		return nil, nil, err
+	}
+	return before, after, nil
 }
