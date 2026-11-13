@@ -1,9 +1,9 @@
 # k8s-tui
 
-A terminal UI for looking at a Kubernetes cluster, written in Go with
-[Bubble Tea](https://github.com/charmbracelet/bubbletea) and
-[Lip Gloss](https://github.com/charmbracelet/lipgloss). It talks to the
-cluster of your current kubeconfig context, the same one `kubectl` uses.
+A terminal UI for Kubernetes, written in Go with
+[Bubble Tea](https://github.com/charmbracelet/bubbletea),
+[Lip Gloss](https://github.com/charmbracelet/lipgloss) and client-go.
+It uses your current kubeconfig context, the same one `kubectl` uses.
 
 ```
   Nodes      Pods      Deployments      Services      More
@@ -13,60 +13,31 @@ cluster of your current kubeconfig context, the same one `kubectl` uses.
 │ worker1                        Ready      v1.37.2                  │
 │ worker2                        Ready      v1.37.2                  │
 └─ $ kubectl get nodes ──────────────────────────────────────────────┘
-
-tab focus • ←→ tab/button • ↑↓ move • enter press • w wide • r refresh • q quit
 ```
 
-- **Nodes** are loaded live from the cluster: name, status and kubelet version.
-- **Wide** adds the columns of `kubectl get nodes -o wide`: internal and
-  external IP, OS image, kernel version and container runtime.
-- **The kubectl command** behind what you see is on the panel's bottom
-  border, for example `$ kubectl get nodes -o wide`.
-- **Long lists scroll**: the panel shows the rows that fit, and the bottom
-  border says which ones, for example `4-12 of 30`.
-- **Auto refresh** reloads the tab you're on every 2, 5 or 10 seconds, or
-  not at all. The time of the last update shows in the top-right corner.
-- **More** lists every resource type the cluster serves, like
-  `kubectl api-resources` (with wide: the verbs and categories too). It is
-  loaded once, when you first open it.
-- **Pods, Deployments and Services** show placeholder rows for now; they
-  are not loaded from the cluster yet, but refresh and show their update
-  time like the other tabs.
+## Features
+
+- **Nodes**, live from the cluster, with `w` for the wide columns
+- **Node actions** (`enter` on a node): describe, show labels and taints,
+  shell (`kubectl debug`), cordon, uncordon, label and taint. Flags are tick
+  boxes, changes ask for `y`, and `--dry-run=server` shows what would change.
+- **More**: every resource type, like `kubectl api-resources`
+- Auto refresh (off, 2s, 5s or 10s), scrolling, and the kubectl command for
+  what you see on the bottom border
 
 ## Run
 
-You need Go 1.26 or newer and a working kubeconfig (`~/.kube/config`, or
-the file in `$KUBECONFIG`). If `kubectl get nodes` works, this will too.
+You need Go 1.26+ and a kubeconfig that works with `kubectl get nodes`.
+The Shell action also needs `kubectl` installed.
 
 ```sh
 go run .
 ```
 
-or build a binary:
-
-```sh
-go build -o k8s-tui .
-./k8s-tui
-```
-
-If the kubeconfig can't be read, the app prints why and exits. If the
-cluster can't be reached, the panel shows the error instead of the rows.
-
 ## Keys
 
-| Key | Does |
-|---|---|
-| `←` `→` (or `h` `l`) | switch tab; on the buttons, move between them |
-| `↑` `↓` (or `k` `j`) | move between the tabs, the buttons and the list, and through the list |
-| `pgup` / `pgdown` | a page up or down the list |
-| `tab` | step the focus: tabs → buttons → list |
-| `shift+tab` | previous tab |
-| `enter` / `space` | press the button the cursor is on |
-| `w` | wide columns on/off for the tab you're on, from anywhere |
-| `r` | change the refresh rate from anywhere: off → 2s → 5s → 10s |
-| `q` / `ctrl+c` | quit |
-
-See [docs/keys.md](docs/keys.md) for the details.
+`←→` tabs • `↑↓` move • `tab` focus • `enter` actions • `w` wide •
+`r` refresh rate • `q` quit. More in [docs/keys.md](docs/keys.md).
 
 ## Test
 
@@ -74,10 +45,5 @@ See [docs/keys.md](docs/keys.md) for the details.
 go test ./...
 ```
 
-The tests use client-go's fake cluster, so they need no real cluster.
-
-## More
-
-- [Keys](docs/keys.md): every key, and where the cursor can be
-- [Architecture](docs/architecture.md): how the code is organised, and how
-  to add a tab, a key or a button
+The tests use client-go's fake cluster, so they don't need a real one.
+How the code is laid out is in [docs/architecture.md](docs/architecture.md).

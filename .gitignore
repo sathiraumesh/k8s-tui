@@ -1,0 +1,18 @@
+# The built app (go build) and other binaries
+/k8s-tui
+*.exe
+*.test
+*.out
+
+# Coverage and profiles
+coverage.*
+*.prof
+
+# Editors and macOS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local environment
+.env
