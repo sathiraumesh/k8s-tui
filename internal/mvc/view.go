@@ -48,6 +48,9 @@ func (m Model) View() string {
 	if m.width == 0 {
 		return "loading..."
 	}
+	if m.splash {
+		return m.splashView()
+	}
 
 	// Tab bar: underline the active tab only when the cursor is on the tabs
 	var tabs []string

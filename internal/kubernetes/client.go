@@ -72,3 +72,9 @@ func NewClient() (*Client, error) {
 		context:   raw.CurrentContext,
 	}, nil
 }
+
+// Context is the name of the kubeconfig context the client talks to, e.g.
+// "kubernetes-admin@kubernetes", or "" if it has none (a pretend cluster).
+func (c *Client) Context() string {
+	return c.context
+}

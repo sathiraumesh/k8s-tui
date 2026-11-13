@@ -42,11 +42,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.keepCursorVisible()
 		}
 
+	// Time for the next picture of the start-up screen (splash.go).
+	case splashTickMsg:
+		return m.onSplashTick()
+
 	// An action finished (actions.go).
 	case actionDoneMsg:
 		return m.onActionDone(msg)
 
 	case tea.KeyMsg:
+		if m.splash {
+			// Nothing is on screen to act on yet; only quitting works.
+			if k := msg.String(); k == KeyQuit || k == KeyCtrlC {
+				return m, tea.Quit
+			}
+			return m, nil
+		}
 		m.notice = "" // a key press clears the last action's message
 		if m.overlay != overlayNone {
 			return m.onOverlayKey(msg)

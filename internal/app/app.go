@@ -24,7 +24,7 @@ func New() *App {
 	}
 
 	return &App{
-		state: mvc.New(client),
+		state: mvc.New(client).WithSplash(), // the start-up screen until the nodes load
 	}
 }
 

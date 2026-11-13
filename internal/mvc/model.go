@@ -105,6 +105,11 @@ type Model struct {
 	// keyed by tab name. Each tab has its own setting; a missing entry is off.
 	// Toggled by the wide button or KeyWide.
 	wide map[string]bool
+
+	// splash is whether the start-up screen is showing in place of the tabs,
+	// and splashFrame how many pictures of its animation were shown (splash.go).
+	splash      bool
+	splashFrame int
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each
@@ -136,5 +141,5 @@ func (m Model) Init() tea.Cmd {
 	if m.client == nil {
 		return nil // tests: no cluster, no timer
 	}
-	return tea.Batch(m.loadActive(), m.startTimer())
+	return tea.Batch(m.loadActive(), m.startTimer(), m.splashTick())
 }
