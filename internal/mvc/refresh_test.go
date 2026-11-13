@@ -81,11 +81,11 @@ func TestTickReloadsActiveTabAndSchedulesNext(t *testing.T) {
 // other: the tick reloads it, and only it.
 func TestTickReloadsPlaceholderTab(t *testing.T) {
 	m := fastClient()
-	m.active = 1 // Pods: placeholder rows
+	m.active = 2 // Deployments: placeholder rows
 	_, cmd := m.Update(refreshTickMsg{})
 	msgs := runBatch(t, cmd)
-	if !hasLoaded(msgs, tabPods) {
-		t.Errorf("tick sent %#v, want a reload of Pods", msgs)
+	if !hasLoaded(msgs, tabDeployments) {
+		t.Errorf("tick sent %#v, want a reload of Deployments", msgs)
 	}
 	if hasLoaded(msgs, tabNodes) {
 		t.Errorf("tick sent %#v, want only the active tab reloaded", msgs)

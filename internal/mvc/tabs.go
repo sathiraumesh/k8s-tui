@@ -60,7 +60,7 @@ func allTabs() []tab {
 		},
 		{
 			name:        tabPods,
-			load:        placeholder(tabPods, "nginx-7c5ddbdf54-abcde", "redis-0", "api-6f9d8b7c9-xyz12"),
+			load:        loadPods,
 			command:     "kubectl get pods --all-namespaces",
 			autoRefresh: true,
 		},
