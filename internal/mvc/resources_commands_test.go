@@ -101,7 +101,7 @@ func TestResourceRowsAligned(t *testing.T) {
 // ---------- loading ----------
 
 func TestLoadResources(t *testing.T) {
-	msg := loadResources(resourcesClient(), false)().(itemsLoadedMsg)
+	msg := loadResources(resourcesClient(), false, "")().(itemsLoadedMsg)
 	if msg.err != nil || msg.tab != tabMore || msg.wide {
 		t.Fatalf("msg = %#v", msg)
 	}
@@ -111,7 +111,7 @@ func TestLoadResources(t *testing.T) {
 }
 
 func TestLoadResourcesWide(t *testing.T) {
-	msg := loadResources(resourcesClient(), true)().(itemsLoadedMsg)
+	msg := loadResources(resourcesClient(), true, "")().(itemsLoadedMsg)
 	if !msg.wide || !strings.Contains(msg.rows[0], "get,list,watch") {
 		t.Errorf("msg = %#v, want wide rows with verbs", msg)
 	}
@@ -122,7 +122,7 @@ func TestLoadResourcesError(t *testing.T) {
 	cs.PrependReactor("get", "group", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("forbidden")
 	})
-	msg := loadResources(k8s.NewClientFromClientset(cs), false)().(itemsLoadedMsg)
+	msg := loadResources(k8s.NewClientFromClientset(cs), false, "")().(itemsLoadedMsg)
 	if msg.err == nil || msg.tab != tabMore {
 		t.Errorf("msg = %#v, want an error for More", msg)
 	}

@@ -22,6 +22,9 @@ const (
 	// Search the list of the tab on screen
 	KeySearch = "/"
 
+	// Pick the namespace the namespaced tabs (Pods) show
+	KeyNamespace = "n"
+
 	// The tab's own actions, e.g. run a new pod on Pods: the "+" of its
 	// "+ run" button, as "/" is the key of "/ search"
 	KeyOwn = "+"

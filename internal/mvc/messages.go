@@ -26,6 +26,8 @@ var refreshRates = []time.Duration{refreshOff, refreshFast, refreshNormal, refre
 // itemsLoadedMsg is sent to Update when a tab's data has been loaded.
 // Every tab uses this same message, so Update needs only one case for all of them.
 type itemsLoadedMsg struct {
+	namespace string // the namespace the rows are from, "" for all (namespaced tabs only)
+
 	tab  string    // which tab the rows are for, e.g. "Nodes"
 	rows []string  // one line of text per item
 	err  error     // set if the API call failed

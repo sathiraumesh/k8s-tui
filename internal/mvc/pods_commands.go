@@ -18,14 +18,15 @@ import (
 
 // loadPods calls the API for the pods of every namespace (like
 // `kubectl get pods --all-namespaces`, or with wide, `-o wide`).
-func loadPods(c *k8s.Client, wide bool) tea.Cmd {
+func loadPods(c *k8s.Client, wide bool, namespace string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()
 
-		pods, err := c.ListPods(ctx, "") // "": all namespaces
+		pods, err := c.ListPods(ctx, namespace) // "": all namespaces
 		now := time.Now()
-		return itemsLoadedMsg{tab: tabPods, rows: podRows(pods, wide, now), err: err, at: now, wide: wide}
+		rows := podRows(pods, wide, namespace == allNamespaces, now)
+		return itemsLoadedMsg{tab: tabPods, rows: rows, err: err, at: now, wide: wide, namespace: namespace}
 	}
 }
 
@@ -34,15 +35,20 @@ func loadPods(c *k8s.Client, wide bool) tea.Cmd {
 //
 //	NAMESPACE  NAME  READY  STATUS  RESTARTS  AGE
 //
-// With wide, the columns `-o wide` adds come after:
+// With withNamespace false (one namespace is shown, like `kubectl get pods
+// -n NAMESPACE`) the NAMESPACE column is left out. With wide, the columns
+// `-o wide` adds come after:
 //
 //	IP  NODE  NOMINATED-NODE  READINESS-GATES
 //
 // now is the time the ages are counted to.
-func podRows(pods []k8s.Pod, wide bool, now time.Time) []string {
+func podRows(pods []k8s.Pod, wide, withNamespace bool, now time.Time) []string {
 	cells := make([][]string, 0, len(pods))
 	for _, p := range pods {
-		row := []string{p.Namespace, p.Name, p.Ready, p.Status, restarts(p, now), age(p.CreatedAt, now)}
+		row := []string{p.Name, p.Ready, p.Status, restarts(p, now), age(p.CreatedAt, now)}
+		if withNamespace {
+			row = append([]string{p.Namespace}, row...)
+		}
 		if wide {
 			row = append(row, orNone(p.IP), orNone(p.Node), orNone(p.NominatedNode), orNone(p.ReadinessGates))
 		}
@@ -71,11 +77,15 @@ func age(t, now time.Time) string {
 
 // ---------- actions on a pod ----------
 
-// podTarget is what a pod row's actions are for: "NAMESPACE/NAME", from
-// its first two columns.
-func podTarget(row string) string {
+// podTarget is what a pod row's actions are for: "NAMESPACE/NAME". While
+// all namespaces are shown those are the row's first two columns; in one
+// namespace the row starts with the name.
+func podTarget(row, namespace string) string {
 	f := strings.Fields(row)
-	if len(f) < 2 {
+	switch {
+	case namespace != allNamespaces:
+		return namespace + "/" + rowName(row)
+	case len(f) < 2:
 		return rowName(row)
 	}
 	return f[0] + "/" + f[1]

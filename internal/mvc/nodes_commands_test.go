@@ -66,7 +66,7 @@ func TestNodeRowsEmpty(t *testing.T) {
 func TestLoadNodes(t *testing.T) {
 	client := k8s.NewClientFromClientset(fake.NewClientset(readyNode("worker1"), readyNode("controlplane")))
 
-	msg, ok := loadNodes(client, false)().(itemsLoadedMsg)
+	msg, ok := loadNodes(client, false, "")().(itemsLoadedMsg)
 	if !ok {
 		t.Fatalf("loadNodes sent %T, want itemsLoadedMsg", msg)
 	}
@@ -87,7 +87,7 @@ func TestLoadNodesError(t *testing.T) {
 		return true, nil, errors.New("connection refused")
 	})
 
-	msg := loadNodes(k8s.NewClientFromClientset(cs), false)().(itemsLoadedMsg)
+	msg := loadNodes(k8s.NewClientFromClientset(cs), false, "")().(itemsLoadedMsg)
 	if msg.err == nil {
 		t.Fatal("err = nil, want an error")
 	}

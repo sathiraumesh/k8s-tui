@@ -26,8 +26,9 @@ const (
 
 // loader returns the command that loads a tab's rows. It sends an
 // itemsLoadedMsg for the tab, with the rows (with or without the wide
-// columns) and when they were loaded.
-type loader func(c *k8s.Client, wide bool) tea.Cmd
+// columns) and when they were loaded. namespace is the one to load from,
+// "" for all of them; a tab that isn't namespaced always gets "".
+type loader func(c *k8s.Client, wide bool, namespace string) tea.Cmd
 
 // tab describes one tab.
 type tab struct {
@@ -48,7 +49,7 @@ type tab struct {
 	//
 	// commandTarget is how that is written in a kubectl command, e.g.
 	// "default/web" as "web -n default". nil writes it as it is.
-	rowTarget     func(row string) string
+	rowTarget     func(row, namespace string) string
 	commandTarget func(target string) string
 
 	// own are actions of the tab itself, not of a row, e.g. running a new
@@ -59,6 +60,12 @@ type tab struct {
 	ownButton string
 	ownTitle  string
 	ownTarget string
+
+	// namespaced is whether the tab shows things that are in a namespace
+	// (pods, not nodes). It then has the namespace button, and loads from
+	// the namespace picked there (namespace.go). Its command gets
+	// --all-namespaces or -n NAMESPACE.
+	namespaced bool
 
 	// autoRefresh is whether the refresh timer reloads the tab. A tab that
 	// isn't auto refreshed is loaded the first time it is opened, and again
@@ -79,7 +86,8 @@ func allTabs() []tab {
 		{
 			name:          tabPods,
 			load:          loadPods,
-			command:       "kubectl get pods --all-namespaces",
+			command:       "kubectl get pods",
+			namespaced:    true,
 			actions:       podActions(),
 			rowTarget:     podTarget,
 			commandTarget: podArgs,
@@ -92,13 +100,15 @@ func allTabs() []tab {
 		{
 			name:        tabDeployments,
 			load:        placeholder(tabDeployments, "nginx", "api"),
-			command:     "kubectl get deployments --all-namespaces",
+			command:     "kubectl get deployments",
+			namespaced:  true,
 			autoRefresh: true,
 		},
 		{
 			name:        tabServices,
 			load:        placeholder(tabServices, "kubernetes", "nginx-svc", "redis"),
-			command:     "kubectl get services --all-namespaces",
+			command:     "kubectl get services",
+			namespaced:  true,
 			autoRefresh: true,
 		},
 		{
@@ -122,8 +132,17 @@ func (m Model) kubectlCommand() string {
 		return a.commandFor(m.commandTarget(), a.inputDefault, a.flags)
 	case overlayConfirm, overlayText:
 		return m.chosen().commandFor(m.commandTarget(), m.input, m.flags)
+	case overlayNamespaces:
+		return "kubectl get namespaces"
 	}
 	cmd := m.activeTab().command
+	if cmd != "" && m.activeTab().namespaced {
+		if ns := m.tabNamespace(); ns == allNamespaces {
+			cmd += " --all-namespaces"
+		} else {
+			cmd += " -n " + ns
+		}
+	}
 	if cmd != "" && m.activeWide() {
 		cmd += " -o wide"
 	}
@@ -148,9 +167,9 @@ func shellQuote(s string) string {
 // gets an update time, auto refresh and the wide setting. To load the tab
 // from the cluster, replace placeholder(...) with a real loader in allTabs.
 func placeholder(name string, rows ...string) loader {
-	return func(_ *k8s.Client, wide bool) tea.Cmd {
+	return func(_ *k8s.Client, wide bool, namespace string) tea.Cmd {
 		return func() tea.Msg {
-			return itemsLoadedMsg{tab: name, rows: rows, at: time.Now(), wide: wide}
+			return itemsLoadedMsg{tab: name, rows: rows, at: time.Now(), wide: wide, namespace: namespace}
 		}
 	}
 }

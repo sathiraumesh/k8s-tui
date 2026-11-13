@@ -16,7 +16,7 @@ import (
 
 // loadNodes calls the API for the nodes (like `kubectl get nodes`, or with
 // wide, `kubectl get nodes -o wide`).
-func loadNodes(c *k8s.Client, wide bool) tea.Cmd {
+func loadNodes(c *k8s.Client, wide bool, _ string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()

@@ -15,7 +15,7 @@ import (
 
 // loadResources asks the cluster which resource types it serves (like
 // `kubectl api-resources`, or with wide, `kubectl api-resources -o wide`).
-func loadResources(c *k8s.Client, wide bool) tea.Cmd {
+func loadResources(c *k8s.Client, wide bool, _ string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()

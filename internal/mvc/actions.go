@@ -33,10 +33,11 @@ import (
 type overlay int
 
 const (
-	overlayNone    overlay = iota // the tab's list
-	overlayActions                // the actions for the selected row
-	overlayConfirm                // the chosen action's flags, and y/n or enter to run it
-	overlayText                   // the text a read action returned, e.g. Describe
+	overlayNone       overlay = iota // the tab's list
+	overlayActions                   // the actions for the selected row
+	overlayConfirm                   // the chosen action's flags, and y/n or enter to run it
+	overlayText                      // the text a read action returned, e.g. Describe
+	overlayNamespaces                // the namespaces to pick from (namespace.go)
 )
 
 // flag is one kubectl option of an action, shown as a tick box. It is
@@ -269,7 +270,7 @@ func rowName(row string) string {
 // rowTarget is what the actions of row are for (see tab.rowTarget).
 func (m Model) rowTarget(row string) string {
 	if f := m.activeTab().rowTarget; f != nil {
-		return f(row)
+		return f(row, m.tabNamespace())
 	}
 	return rowName(row)
 }
@@ -322,6 +323,9 @@ func (m Model) openOwnActions() Model {
 		return m
 	}
 	m.target = t.ownTarget
+	if t.namespaced && m.namespace != allNamespaces {
+		m.target = m.namespace // e.g. run the pod in the namespace picked
+	}
 	m.tabActions = true
 	m.overlay = overlayActions
 	m.overlayCursor = 0
@@ -519,6 +523,9 @@ func (m Model) onOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.overlay = overlayActions
 			m.overlayCursor = m.chosenAction
 		}
+
+	case overlayNamespaces:
+		return m.onNamespacesKey(key)
 	}
 	return m, nil
 }

@@ -73,5 +73,5 @@ func (m Model) loadActive() tea.Cmd {
 		return nil
 	}
 	t := m.activeTab()
-	return t.load(m.client, m.wide[t.name])
+	return t.load(m.client, m.wide[t.name], m.tabNamespace())
 }

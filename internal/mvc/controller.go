@@ -25,6 +25,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.wide != m.wide[msg.tab] {
 			return m, nil
 		}
+		// Rows from the namespace picked before: the load the new pick
+		// started brings the right ones.
+		if t, ok := m.tabNamed(msg.tab); ok && t.namespaced && msg.namespace != m.namespace {
+			return m, nil
+		}
 		if msg.err != nil {
 			m.err = msg.err
 			return m, nil
@@ -45,6 +50,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Time for the next picture of the start-up screen (splash.go).
 	case splashTickMsg:
 		return m.onSplashTick()
+
+	// The namespaces to pick from arrived (namespace.go).
+	case namespacesLoadedMsg:
+		return m.onNamespacesLoaded(msg), nil
 
 	// An action finished (actions.go).
 	case actionDoneMsg:
@@ -92,6 +101,12 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// /: search the list, same as pressing the button (search.go).
 	case KeySearch:
 		return m.startSearch(), nil
+
+	// n: pick the namespace, on a namespaced tab (namespace.go).
+	case KeyNamespace:
+		if m.activeTab().namespaced {
+			return m.openNamespaces()
+		}
 
 	// +: the tab's own actions (e.g. run a pod), same as its "+ run" button.
 	case KeyOwn:
@@ -214,6 +229,8 @@ func (m Model) pressButton() (tea.Model, tea.Cmd) {
 		return m.startSearch(), nil
 	case buttonOwn:
 		return m.openOwnActions(), nil
+	case buttonNamespace:
+		return m.openNamespaces()
 	}
 	return m, nil
 }

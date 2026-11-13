@@ -120,6 +120,14 @@ type Model struct {
 	// tabActions is whether the open action list is the tab's own actions
 	// (tab.own, e.g. Run on Pods) rather than the actions for a row.
 	tabActions bool
+
+	// namespace is the namespace the namespaced tabs show, allNamespaces
+	// ("") for all of them. namespaces are the ones to pick from, loaded
+	// when the picker opens, and namespacesErr why they couldn't be
+	// (namespace.go).
+	namespace     string
+	namespaces    []string
+	namespacesErr error
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each

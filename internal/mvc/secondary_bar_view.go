@@ -20,10 +20,11 @@ const buttonGap = 3
 
 // Button names, so Update knows which button was pressed.
 const (
-	buttonWide    = "wide"
-	buttonRefresh = "refresh"
-	buttonSearch  = "search"
-	buttonOwn     = "own" // the tab's own actions, e.g. "+ run" on Pods
+	buttonWide      = "wide"
+	buttonRefresh   = "refresh"
+	buttonSearch    = "search"
+	buttonOwn       = "own" // the tab's own actions, e.g. "+ run" on Pods
+	buttonNamespace = "namespace"
 )
 
 // searchLabelWidth is the most of the search its button shows.
@@ -71,13 +72,18 @@ func (b button) render(focused bool) string {
 // panelButtons are the buttons on the panel's top border, left to right
 // (same order as systems-programing):
 //
-//	[wide: off] [refresh: 5s] [+ run] [/ search]
+//	[ns: all] [wide: off] [refresh: 5s] [+ run] [/ search]
 //
-// Each is green when on: wide while the active tab shows its wide columns,
-// refresh while auto refresh runs, search while the list is searched. The
-// tab's own button (+ run on Pods) is only on a tab with own actions.
+// Each is green when on: ns while one namespace is picked, wide while the
+// active tab shows its wide columns, refresh while auto refresh runs,
+// search while the list is searched. ns is only on a namespaced tab, and
+// the tab's own button (+ run on Pods) only on a tab with own actions.
 func (m Model) panelButtons() []button {
-	buttons := []button{m.wideButton()}
+	var buttons []button
+	if m.activeTab().namespaced {
+		buttons = append(buttons, m.namespaceButton())
+	}
+	buttons = append(buttons, m.wideButton())
 	if m.autoRefreshed() { // a tab that isn't auto refreshed (More) has no refresh button
 		buttons = append(buttons, m.refreshButton())
 	}
@@ -85,6 +91,18 @@ func (m Model) panelButtons() []button {
 		buttons = append(buttons, button{name: buttonOwn, label: t.ownButton})
 	}
 	return append(buttons, m.searchButton())
+}
+
+// namespaceButton is "ns: all", or the namespace picked, e.g. "ns: default".
+func (m Model) namespaceButton() button {
+	if m.namespace == allNamespaces {
+		return button{name: buttonNamespace, label: "ns: all"}
+	}
+	name := m.namespace
+	if r := []rune(name); len(r) > searchLabelWidth {
+		name = string(r[:searchLabelWidth-1]) + "…"
+	}
+	return button{name: buttonNamespace, label: "ns: " + name, on: true}
 }
 
 // wideButton is "wide: off", or "wide: on" while the tab shows its wide columns.

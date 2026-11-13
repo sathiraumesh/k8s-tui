@@ -21,7 +21,7 @@ func TestPodRows(t *testing.T) {
 		{Namespace: "default", Name: "web", Ready: "1/1", Status: "Running", CreatedAt: podsNow.Add(-3 * time.Hour), IP: "10.0.0.5", Node: "worker1"},
 		{Namespace: "kube-system", Name: "dns", Ready: "0/1", Status: "CrashLoopBackOff", Restarts: 4, LastRestart: podsNow.Add(-5 * time.Minute), CreatedAt: podsNow.Add(-8 * 24 * time.Hour)},
 	}
-	got := podRows(pods, false, podsNow)
+	got := podRows(pods, false, true, podsNow)
 	want := []string{
 		"default       web   1/1   Running            0            3h",
 		"kube-system   dns   0/1   CrashLoopBackOff   4 (5m ago)   8d",
@@ -30,7 +30,7 @@ func TestPodRows(t *testing.T) {
 		t.Errorf("rows =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
-	wide := podRows(pods, true, podsNow)
+	wide := podRows(pods, true, true, podsNow)
 	if !strings.HasSuffix(wide[0], "10.0.0.5   worker1   <none>   <none>") || !strings.HasSuffix(wide[1], "8d   <none>     <none>    <none>   <none>") {
 		t.Errorf("wide rows =\n%s", strings.Join(wide, "\n"))
 	}
@@ -56,7 +56,7 @@ func podsClient() *fake.Clientset {
 }
 
 func TestLoadPods(t *testing.T) {
-	msg := loadPods(k8s.NewClientFromClientset(podsClient()), false)().(itemsLoadedMsg)
+	msg := loadPods(k8s.NewClientFromClientset(podsClient()), false, "")().(itemsLoadedMsg)
 	if msg.err != nil || msg.tab != tabPods || len(msg.rows) != 1 || !strings.HasPrefix(msg.rows[0], "default   web   0/1   Running") {
 		t.Errorf("loadPods = %+v", msg)
 	}
@@ -103,7 +103,7 @@ func TestPodsOnlyLoadedOnPodsTab(t *testing.T) {
 // ---------- actions on a pod ----------
 
 func TestPodTarget(t *testing.T) {
-	if got := podTarget("kube-system   coredns-abc   1/1   Running"); got != "kube-system/coredns-abc" {
+	if got := podTarget("kube-system   coredns-abc   1/1   Running", ""); got != "kube-system/coredns-abc" {
 		t.Errorf("podTarget = %q", got)
 	}
 	if got := podArgs("kube-system/coredns-abc"); got != "coredns-abc -n kube-system" {

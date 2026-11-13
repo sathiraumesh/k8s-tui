@@ -68,7 +68,7 @@ func TestActiveTab(t *testing.T) {
 // ---------- placeholder tabs ----------
 
 func TestPlaceholderSendsItsRows(t *testing.T) {
-	msg := placeholder("Things", "a", "b")(nil, false)().(itemsLoadedMsg)
+	msg := placeholder("Things", "a", "b")(nil, false, "")().(itemsLoadedMsg)
 	if msg.tab != "Things" || !slices.Equal(msg.rows, []string{"a", "b"}) || msg.err != nil {
 		t.Errorf("msg = %#v, want rows a, b for Things", msg)
 	}
@@ -79,7 +79,7 @@ func TestPlaceholderSendsItsRows(t *testing.T) {
 
 // The placeholder keeps the wide setting, so Update doesn't drop its rows.
 func TestPlaceholderKeepsWide(t *testing.T) {
-	if msg := placeholder("Things", "a")(nil, true)().(itemsLoadedMsg); !msg.wide {
+	if msg := placeholder("Things", "a")(nil, true, "")().(itemsLoadedMsg); !msg.wide {
 		t.Error("wide = false, want the wide setting it was given")
 	}
 }
@@ -134,7 +134,7 @@ func TestEveryTabShowsLastUpdate(t *testing.T) {
 func TestPlaceholderTabGetsUpdateTime(t *testing.T) {
 	m := New(nil)
 	m.active = 2 // Deployments
-	msg := m.activeTab().load(nil, false)()
+	msg := m.activeTab().load(nil, false, "")()
 	m = press(t, m, msg)
 	if !strings.HasPrefix(m.lastUpdated(), "updated ") {
 		t.Errorf("lastUpdated on Deployments = %q, want an update time", m.lastUpdated())
