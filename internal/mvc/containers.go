@@ -28,14 +28,14 @@ type containersLoadedMsg struct {
 	err    error
 }
 
-// loadContainers calls the API for the containers of the pod target.
-// With running, only the containers that are running now.
-func loadContainers(c *k8s.Client, target string, running bool) tea.Cmd {
+// loadContainers calls the API for the containers of target, with list,
+// the action's lister. With running, only those a shell can be opened in.
+func loadContainers(c *k8s.Client, target string, list commands.ContainerLister, running bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()
 		namespace, name := commands.SplitTarget(target)
-		names, err := c.PodContainers(ctx, namespace, name, running)
+		names, err := list(c, ctx, namespace, name, running)
 		return containersLoadedMsg{target: target, names: names, err: err}
 	}
 }
@@ -48,9 +48,15 @@ func (m Model) onContainersLoaded(msg containersLoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.err != nil || len(msg.names) < 2 {
-		m.input = commands.AllContainers
-		if m.chosen().OneContainer {
-			m.input = "" // the pod's only container: kubectl needs no -c
+		switch {
+		case m.chosen().Input != "" && len(msg.names) == 1:
+			m.input = msg.names[0] + "=" // e.g. Set image: "app=", the image to type
+		case m.chosen().Input != "":
+			m.input = "" // couldn't load them: the whole thing is typed
+		case m.chosen().OneContainer:
+			m.input = "" // the only container: kubectl needs no -c
+		default:
+			m.input = commands.AllContainers
 		}
 		return m.afterPick()
 	}
@@ -79,6 +85,9 @@ func (m Model) onContainersKey(key string) (tea.Model, tea.Cmd) {
 		m.overlayCursor = min(m.overlayCursor+1, len(choices)-1)
 	case KeyEnter:
 		m.input = choices[m.overlayCursor]
+		if m.chosen().Input != "" {
+			m.input += "=" // e.g. Set image: "app=", or "*=" for all, the image to type
+		}
 		return m.afterPick()
 	case KeyEsc:
 		m.overlay = overlayActions

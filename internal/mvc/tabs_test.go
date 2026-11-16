@@ -134,13 +134,13 @@ func TestEveryTabShowsLastUpdate(t *testing.T) {
 // loader's message.
 func TestPlaceholderTabGetsUpdateTime(t *testing.T) {
 	m := New(nil)
-	m.active = 2 // Deployments
+	m.active = 3 // Services
 	msg := m.activeTab().load(nil, false, "")()
 	m = press(t, m, msg)
 	if !strings.HasPrefix(m.lastUpdated(), "updated ") {
-		t.Errorf("lastUpdated on Deployments = %q, want an update time", m.lastUpdated())
+		t.Errorf("lastUpdated on Services = %q, want an update time", m.lastUpdated())
 	}
-	if got := m.items[tabDeployments]; len(got) != 2 || got[0] != "nginx" {
-		t.Errorf("Deployments rows = %q, want the placeholder rows", got)
+	if got := m.items[tabServices]; len(got) != 3 || got[0] != "kubernetes" {
+		t.Errorf("Services rows = %q, want the placeholder rows", got)
 	}
 }

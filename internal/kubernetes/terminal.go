@@ -110,3 +110,10 @@ func PodShellArgs(namespace, name, container string, bash bool, kubeContext stri
 func (c *Client) EditPod(namespace, name string) (*exec.Cmd, error) {
 	return kubectl(withContext([]string{"edit", "pod", name, "-n", namespace}, c.context))
 }
+
+// EditDeployment returns the command that opens the deployment in an
+// editor, like `kubectl edit deployment NAME -n NAMESPACE`. Saving a
+// changed pod template rolls out new pods.
+func (c *Client) EditDeployment(namespace, name string) (*exec.Cmd, error) {
+	return kubectl(withContext([]string{"edit", "deployment", name, "-n", namespace}, c.context))
+}

@@ -77,10 +77,11 @@ func age(t, now time.Time) string {
 
 // ---------- actions on a pod ----------
 
-// PodTarget is what a pod row's actions are for: "NAMESPACE/NAME". While
+// NamespacedTarget is what the actions of a row of something in a namespace
+// (a pod, a deployment) are for: "NAMESPACE/NAME". While
 // all namespaces are shown those are the row's first two columns; in one
 // namespace the row starts with the name.
-func PodTarget(row, namespace string) string {
+func NamespacedTarget(row, namespace string) string {
 	f := strings.Fields(row)
 	switch {
 	case namespace != AllNamespaces:
@@ -97,8 +98,8 @@ func SplitTarget(target string) (namespace, name string) {
 	return namespace, name
 }
 
-// PodArgs writes "NAMESPACE/NAME" the way kubectl takes it: "NAME -n NAMESPACE".
-func PodArgs(target string) string {
+// NamespacedArgs writes "NAMESPACE/NAME" the way kubectl takes it: "NAME -n NAMESPACE".
+func NamespacedArgs(target string) string {
 	namespace, name := SplitTarget(target)
 	return name + " -n " + namespace
 }
@@ -135,7 +136,7 @@ func PodActions() []Action {
 		{
 			Key: "o", Name: "Logs", About: fmt.Sprintf("the last %d lines of each container, newest at the bottom", logTail),
 			Flags:      []Flag{{Name: flagPrevious}, {Name: flagTimestamps}},
-			Containers: true,
+			Containers: (*k8s.Client).PodContainers,
 			InputArgs:  ContainerArgs,
 			Command:    fmt.Sprintf("kubectl logs %%s {input} --tail=%d", logTail),
 			Run: func(c *k8s.Client, target, container string, flags []Flag) tea.Cmd {
@@ -162,7 +163,7 @@ func PodActions() []Action {
 		{
 			Key: "x", Name: "Shell", About: "a shell in one of the pod's containers; the image needs sh (or bash)",
 			Flags:        []Flag{{Name: flagBash, Off: flagSh}},
-			Containers:   true,
+			Containers:   (*k8s.Client).PodContainers,
 			OneContainer: true,
 			InputArgs:    ContainerArgs,
 			Command:      "kubectl exec -it %s {input}",
@@ -179,6 +180,21 @@ func PodActions() []Action {
 				namespace, name := SplitTarget(target)
 				cmd, err := c.EditPod(namespace, name)
 				return InTerminal("Edit", target, "Edit "+target+": editor closed", false, cmd, err)
+			},
+		},
+		{
+			Key: "i", Name: "Set image", About: "change a container's image; it restarts with it (an owner's new pods keep the old one)",
+			Changes:    true,
+			Input:      "images (CONTAINER=IMAGE)",
+			Containers: (*k8s.Client).PodContainers,
+			Flags:      []Flag{{Name: FlagDryRun}},
+			Command:    "kubectl set image pod/%s",
+			Run: func(c *k8s.Client, target, input string, flags []Flag) tea.Cmd {
+				namespace, name := SplitTarget(target)
+				return Change("Set image", target, flags, func(ctx context.Context) (string, error) {
+					ch, err := c.SetPodImage(ctx, namespace, name, strings.Fields(input), Ticked(flags, FlagDryRun))
+					return ChangeText("Images", ch.Before, ch.After), err
+				})
 			},
 		},
 		{
@@ -216,8 +232,8 @@ func PodActions() []Action {
 // a pod has to be in one.
 const RunNamespace = "default"
 
-// podImages are the images offered for a new pod, in the order shown, with
-// the key that picks each. Any other image can be typed (runOtherImage).
+// podImages are the images offered for a new pod or deployment, in the order shown, with
+// the key that picks each. Any other image can be typed (imageActions).
 var podImages = []struct{ key, image, about string }{
 	{"n", "nginx:latest", "a web server"},
 	{"b", "busybox:latest", "a small set of shell tools"},
@@ -233,6 +249,15 @@ var podImages = []struct{ key, image, about string }{
 //
 // The name is typed on the confirm page, and starts as the image's name.
 func RunPodActions() []Action {
+	return imageActions("Run", "kubectl run", (*k8s.Client).RunPod)
+}
+
+// imageActions are actions that make something new from an image: one per
+// image of podImages, and one for any other image, where the name and the
+// image are typed, e.g. "db postgres:16". name is what each is called when
+// it runs ("Run"), command the kubectl command without its arguments
+// ("kubectl run"), and create the cluster call.
+func imageActions(name, command string, create func(c *k8s.Client, ctx context.Context, namespace, name, image string, dryRun bool) error) []Action {
 	actions := make([]Action, 0, len(podImages)+1)
 	for _, img := range podImages {
 		actions = append(actions, Action{
@@ -241,38 +266,32 @@ func RunPodActions() []Action {
 			Input:        "name",
 			InputDefault: ImageName(img.image),
 			Flags:        []Flag{{Name: FlagDryRun}},
-			Command:      "kubectl run " + InputHere + " --image=" + img.image + " -n %s",
-			Run: func(c *k8s.Client, namespace, name string, flags []Flag) tea.Cmd {
-				name = strings.TrimSpace(name)
-				return Change("Run", namespace+"/"+name, flags, func(ctx context.Context) (string, error) {
-					return "", c.RunPod(ctx, namespace, name, img.image, Ticked(flags, FlagDryRun))
+			Command:      command + " " + InputHere + " --image=" + img.image + " -n %s",
+			Run: func(c *k8s.Client, namespace, input string, flags []Flag) tea.Cmd {
+				input = strings.TrimSpace(input)
+				return Change(name, namespace+"/"+input, flags, func(ctx context.Context) (string, error) {
+					return "", create(c, ctx, namespace, input, img.image, Ticked(flags, FlagDryRun))
 				})
 			},
 		})
 	}
-	return append(actions, runOtherImage())
-}
-
-// runOtherImage runs a pod from an image that isn't in the list: the name
-// and the image are typed, e.g. "db postgres:16".
-func runOtherImage() Action {
-	return Action{
+	return append(actions, Action{
 		Key: "o", Name: "other image", About: "type a name and any image, e.g. db postgres:16",
 		Changes:   true,
 		Input:     "name and image",
 		InputArgs: runArgs,
 		Flags:     []Flag{{Name: FlagDryRun}},
-		Command:   "kubectl run " + InputHere + " -n %s",
+		Command:   command + " " + InputHere + " -n %s",
 		Run: func(c *k8s.Client, namespace, input string, flags []Flag) tea.Cmd {
-			name, image, ok := splitNameImage(input)
-			return Change("Run", namespace+"/"+name, flags, func(ctx context.Context) (string, error) {
+			n, image, ok := splitNameImage(input)
+			return Change(name, namespace+"/"+n, flags, func(ctx context.Context) (string, error) {
 				if !ok {
 					return "", fmt.Errorf("type a name and an image, e.g. db postgres:16")
 				}
-				return "", c.RunPod(ctx, namespace, name, image, Ticked(flags, FlagDryRun))
+				return "", create(c, ctx, namespace, n, image, Ticked(flags, FlagDryRun))
 			})
 		},
-	}
+	})
 }
 
 // splitNameImage reads "NAME IMAGE", as typed for another image.

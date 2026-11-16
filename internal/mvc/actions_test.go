@@ -76,8 +76,8 @@ func TestEnterDoesNothingWhileLoading(t *testing.T) {
 
 func TestEnterDoesNothingOnTabWithoutActions(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m.active = 2 // Deployments: no actions
-	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabDeployments, Rows: []string{"nginx"}, At: time.Now()})
+	m.active = 3 // Services: no actions
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabServices, Rows: []string{"nginx-svc"}, At: time.Now()})
 	if m = press(t, m, enterKey); m.overlay != overlayNone {
 		t.Error("actions opened on a tab that has none")
 	}

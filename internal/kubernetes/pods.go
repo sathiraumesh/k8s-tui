@@ -287,7 +287,6 @@ func (c *Client) DescribePod(_ context.Context, namespace, name string, showEven
 // With container set, only that container's logs are returned, without a
 // heading (`kubectl logs NAME -c CONTAINER`).
 func (c *Client) PodLogs(ctx context.Context, namespace, name, container string, previous, timestamps bool, tail int64) (string, error) {
-	pods := c.clientset.CoreV1().Pods(namespace)
 	containers := []string{container}
 	if container == "" {
 		var err error
@@ -298,25 +297,40 @@ func (c *Client) PodLogs(ctx context.Context, namespace, name, container string,
 
 	var b strings.Builder
 	for _, container := range containers {
-		opts := &corev1.PodLogOptions{Container: container, Previous: previous, Timestamps: timestamps, TailLines: &tail}
-		logs, err := pods.GetLogs(name, opts).DoRaw(ctx)
+		logs, err := c.containerLogs(ctx, namespace, name, container, previous, timestamps, tail)
 		if len(containers) == 1 {
 			return string(logs), err
 		}
-		fmt.Fprintf(&b, "==> %s <==\n", container)
-		if err != nil {
-			fmt.Fprintf(&b, "error: %v\n", err)
-		} else if len(logs) == 0 {
-			b.WriteString("(no logs)\n")
-		} else {
-			b.Write(logs)
-			if logs[len(logs)-1] != '\n' {
-				b.WriteByte('\n')
-			}
-		}
-		b.WriteByte('\n')
+		writeLogs(&b, container, logs, err)
 	}
 	return b.String(), nil
+}
+
+// containerLogs returns the last tail lines one container of the pod wrote.
+func (c *Client) containerLogs(ctx context.Context, namespace, pod, container string, previous, timestamps bool, tail int64) ([]byte, error) {
+	opts := &corev1.PodLogOptions{Container: container, Previous: previous, Timestamps: timestamps, TailLines: &tail}
+	return c.clientset.CoreV1().Pods(namespace).GetLogs(pod, opts).DoRaw(ctx)
+}
+
+// writeLogs adds one container's logs to b under a heading, or why they
+// couldn't be read:
+//
+//	==> heading <==
+//	…
+func writeLogs(b *strings.Builder, heading string, logs []byte, err error) {
+	fmt.Fprintf(b, "==> %s <==\n", heading)
+	switch {
+	case err != nil:
+		fmt.Fprintf(b, "error: %v\n", err)
+	case len(logs) == 0:
+		b.WriteString("(no logs)\n")
+	default:
+		b.Write(logs)
+		if logs[len(logs)-1] != '\n' {
+			b.WriteByte('\n')
+		}
+	}
+	b.WriteByte('\n')
 }
 
 // PodContainers returns the names of the pod's containers: the init

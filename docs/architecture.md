@@ -13,6 +13,11 @@ internal/
                             NewClientFromClientset (for tests)
     nodes.go                Node, ListNodes, and turning a client-go node into a Node
     resources.go            Resource, ListResources: every resource type (More tab)
+    pods.go                 Pod, ListPods, and the calls of the pod actions
+    deployments.go          Deployment, ListDeployments, and the calls of the
+                            deployment actions (scale, restart, …)
+    images.go               Set image, for pods and deployments
+    terminal.go             the kubectl commands that need the terminal: shells, editors
   mvc/                      the UI: state, key handling and drawing
     tabs.go                 allTabs: every tab, its loader and whether it auto refreshes
     model.go                Model (all the state), New, Init
@@ -25,6 +30,7 @@ internal/
                             messages commands send: ItemsLoadedMsg, ActionDoneMsg
       nodes.go              LoadNodes, NodeActions
       pods.go               LoadPods, PodActions, RunPodActions
+      deployments.go        LoadDeployments, DeploymentActions, CreateDeploymentActions
       resources.go          LoadResources (More tab)
     refresh.go              the auto refresh timer and rates (logic only)
     secondary_bar_view.go   the buttons on the panel's top border: wide,

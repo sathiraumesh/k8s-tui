@@ -80,14 +80,18 @@ type Action struct {
 	Input        string
 	InputDefault string
 
-	// Containers is whether the action is for one container of a pod. If the
-	// pod has more than one, a picker asks which first (Containers.go); the
-	// choice reaches run as its input.
+	// Containers, if set, lists the containers the action can be for, e.g.
+	// a pod's, and makes it ask which: with more than one, a picker opens
+	// first (mvc/containers.go); the choice reaches Run as its input.
+	//
+	// An action that also has a text field (Input) starts it with the
+	// choice: "app=" for app, "*=" for all of them, e.g. for Set image.
 	//
 	// OneContainer is for an action that can't be for all of them, such as
-	// a shell: the picker then offers only the containers that are running,
-	// and a pod with one container gives no input.
-	Containers   bool
+	// a shell: the picker then offers only the containers that are running
+	// (Containers is called with running), and with one container there is
+	// no input.
+	Containers   ContainerLister
 	OneContainer bool
 
 	// InputArgs is how what was typed is written in the command, e.g.
@@ -298,6 +302,11 @@ type ActionDoneMsg struct {
 	Terminal bool
 	Closed   string
 }
+
+// ContainerLister lists the containers of the thing NAMESPACE/NAME, e.g.
+// (*k8s.Client).PodContainers. With running, only those a shell can be
+// opened in.
+type ContainerLister func(c *k8s.Client, ctx context.Context, namespace, name string, running bool) ([]string, error)
 
 // RowName is the name of the thing a row shows: its first column.
 func RowName(row string) string {

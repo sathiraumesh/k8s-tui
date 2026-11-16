@@ -73,6 +73,28 @@ bottom border shows which rows you see:
 Rows wider than the panel are cut off at its edge. Switching tabs scrolls
 back to the top.
 
+## Actions on a row
+
+`enter` on a row opens what can be done to it; a key (or `enter` on one)
+picks it. Pods and Deployments share keys where the action is the same:
+
+| Key | Pods | Deployments |
+|---|---|---|
+| `d` | Describe | Describe |
+| `o` | Logs (asks which container if there are several) | |
+| `s` | Show labels and annotations | Show labels and annotations |
+| `x` | Shell (asks which running container) | |
+| `e` | Edit the YAML | Edit the YAML |
+| `i` | Set image: pick the container (or all), type the image | Set image (same); rolls out new pods |
+| `c` | | Scale: type the replicas |
+| `t` | | Restart, like `kubectl rollout restart` |
+| `l` | Label | Label |
+| `r` | Delete | Delete |
+
+`+` (or the `+ run` / `+ create` button) makes a new pod or deployment
+from an image. Anything that changes the cluster asks first (`y` runs it)
+and has a `--dry-run=server` tick box.
+
 ## Anywhere
 
 | Key | Does |
@@ -91,14 +113,15 @@ adds the columns `kubectl get nodes -o wide` shows:
 | Normal | Wide adds |
 |---|---|
 | NAME, STATUS, VERSION | INTERNAL-IP, EXTERNAL-IP, OS-IMAGE, KERNEL-VERSION, CONTAINER-RUNTIME |
+| Pods: NAME, READY, STATUS, RESTARTS, AGE | IP, NODE, NOMINATED-NODE, READINESS-GATES |
+| Deployments: NAME, READY, UP-TO-DATE, AVAILABLE, AGE | CONTAINERS, IMAGES, SELECTOR |
 
 An empty external IP shows as `<none>`, as in kubectl.
 
 Each tab has its own setting: switching wide on for Nodes leaves the
 other tabs as they were. Switching it reloads the tab with the new
 columns; the rows on screen stay until the new ones arrive. Auto refresh
-keeps the tab's setting. (Pods, Deployments and Services have no wide
-columns yet.)
+keeps the tab's setting. (Services has no wide columns yet.)
 
 ## Auto refresh
 

@@ -166,7 +166,7 @@ func TestRunInPickedNamespace(t *testing.T) {
 }
 
 func TestPodTargetInNamespace(t *testing.T) {
-	if got := commands.PodTarget("shop   1/1   Running", "apps"); got != "apps/shop" {
+	if got := commands.NamespacedTarget("shop   1/1   Running", "apps"); got != "apps/shop" {
 		t.Errorf("podTarget = %q", got)
 	}
 }

@@ -73,10 +73,10 @@ func TestPodsOnlyLoadedOnPodsTab(t *testing.T) {
 // ---------- actions on a pod ----------
 
 func TestPodTarget(t *testing.T) {
-	if got := commands.PodTarget("kube-system   coredns-abc   1/1   Running", ""); got != "kube-system/coredns-abc" {
+	if got := commands.NamespacedTarget("kube-system   coredns-abc   1/1   Running", ""); got != "kube-system/coredns-abc" {
 		t.Errorf("podTarget = %q", got)
 	}
-	if got := commands.PodArgs("kube-system/coredns-abc"); got != "coredns-abc -n kube-system" {
+	if got := commands.NamespacedArgs("kube-system/coredns-abc"); got != "coredns-abc -n kube-system" {
 		t.Errorf("podArgs = %q", got)
 	}
 }
@@ -124,7 +124,7 @@ func openPodAction(t *testing.T, k string) (Model, *fake.Clientset) {
 	t.Helper()
 	m, cs := podsOnScreen(t)
 	m = press(t, m, down, down, down, enterKey, key(k))
-	if k == "o" || k == "x" { // the pod's containers load first: it has one
+	if k == "o" || k == "x" || k == "i" { // the pod's containers load first: it has one
 		m = press(t, m, containersLoadedMsg{target: "default/web", names: []string{"web"}})
 	}
 	return m, cs
@@ -168,6 +168,7 @@ func TestPodActionCommands(t *testing.T) {
 		"o": "kubectl logs web -n default --all-containers --tail=500",
 		"x": "kubectl exec -it web -n default -- sh",
 		"l": "kubectl label pod web -n default",
+		"i": "kubectl set image pod/web -n default web=",
 		"r": "kubectl delete pod web -n default",
 	} {
 		if m, _ := openPodAction(t, k); m.kubectlCommand() != want {

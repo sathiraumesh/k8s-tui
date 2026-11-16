@@ -108,3 +108,12 @@ func TestPodShellArgsContainer(t *testing.T) {
 		t.Errorf("args = %q, want %q", got, want)
 	}
 }
+
+func TestEditDeployment(t *testing.T) {
+	pretendKubectl(t, "/bin/kubectl")
+	c := NewClientFromClientset(fake.NewClientset())
+	cmd, err := c.EditDeployment("apps", "web")
+	if want := []string{"/bin/kubectl", "edit", "deployment", "web", "-n", "apps"}; err != nil || !slices.Equal(cmd.Args, want) {
+		t.Errorf("edit = %v, err = %v", cmd.Args, err)
+	}
+}
