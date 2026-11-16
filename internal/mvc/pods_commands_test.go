@@ -153,7 +153,28 @@ func TestRunKeepsNamespaceTarget(t *testing.T) {
 func openPodAction(t *testing.T, k string) (Model, *fake.Clientset) {
 	t.Helper()
 	m, cs := podsOnScreen(t)
-	return press(t, m, down, down, down, enterKey, key(k)), cs
+	m = press(t, m, down, down, down, enterKey, key(k))
+	if k == "o" { // the pod's containers load first: it has one
+		m = press(t, m, containersLoadedMsg{target: "default/web", names: []string{"web"}})
+	}
+	return m, cs
+}
+
+// A pod with several containers asks which one before it shows logs.
+func TestPodLogsPickContainer(t *testing.T) {
+	m, _ := podsOnScreen(t)
+	m = press(t, m, down, down, down, enterKey, key("o"))
+	m = press(t, m, containersLoadedMsg{target: "default/web", names: []string{"app", "sidecar"}})
+	if m.overlay != overlayContainers {
+		t.Fatalf("overlay = %d, want the container picker", m.overlay)
+	}
+	if got := m.containerRows(); len(got) != 3 || got[0] != "all containers" || got[2] != "sidecar" {
+		t.Errorf("rows = %q", got)
+	}
+	m = press(t, m, down, down, enterKey) // sidecar
+	if m.overlay != overlayConfirm || m.kubectlCommand() != "kubectl logs web -n default --container=sidecar --tail=500" {
+		t.Errorf("overlay = %d, command = %q", m.overlay, m.kubectlCommand())
+	}
 }
 
 // Every action writes the pod as kubectl takes it, NAME -n NAMESPACE.

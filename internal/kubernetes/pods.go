@@ -283,19 +283,17 @@ func (c *Client) DescribePod(_ context.Context, namespace, name string, showEven
 //
 // A container whose logs can't be read (with previous, one that never
 // restarted) says why under its heading; the others are still shown.
-func (c *Client) PodLogs(ctx context.Context, namespace, name string, previous, timestamps bool, tail int64) (string, error) {
+//
+// With container set, only that container's logs are returned, without a
+// heading (`kubectl logs NAME -c CONTAINER`).
+func (c *Client) PodLogs(ctx context.Context, namespace, name, container string, previous, timestamps bool, tail int64) (string, error) {
 	pods := c.clientset.CoreV1().Pods(namespace)
-	pod, err := pods.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	var containers []string
-	for _, ct := range pod.Spec.InitContainers {
-		containers = append(containers, ct.Name)
-	}
-	for _, ct := range pod.Spec.Containers {
-		containers = append(containers, ct.Name)
+	containers := []string{container}
+	if container == "" {
+		var err error
+		if containers, err = c.PodContainers(ctx, namespace, name); err != nil {
+			return "", err
+		}
 	}
 
 	var b strings.Builder
@@ -319,6 +317,23 @@ func (c *Client) PodLogs(ctx context.Context, namespace, name string, previous, 
 		b.WriteByte('\n')
 	}
 	return b.String(), nil
+}
+
+// PodContainers returns the names of the pod's containers: the init
+// containers first, then the others.
+func (c *Client) PodContainers(ctx context.Context, namespace, name string) ([]string, error) {
+	pod, err := c.clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	var containers []string
+	for _, ct := range pod.Spec.InitContainers {
+		containers = append(containers, ct.Name)
+	}
+	for _, ct := range pod.Spec.Containers {
+		containers = append(containers, ct.Name)
+	}
+	return containers, nil
 }
 
 // LabelsAndAnnotations returns the pod's labels and annotations, as

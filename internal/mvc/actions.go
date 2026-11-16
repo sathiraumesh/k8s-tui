@@ -38,6 +38,7 @@ const (
 	overlayConfirm                   // the chosen action's flags, and y/n or enter to run it
 	overlayText                      // the text a read action returned, e.g. Describe
 	overlayNamespaces                // the namespaces to pick from (namespace.go)
+	overlayContainers                // the containers of a pod to pick from (containers.go)
 )
 
 // flag is one kubectl option of an action, shown as a tick box. It is
@@ -79,6 +80,11 @@ type action struct {
 	// inputDefault is what is in the field to begin with, to be changed.
 	input        string
 	inputDefault string
+
+	// containers is whether the action is for one container of a pod. If the
+	// pod has more than one, a picker asks which first (containers.go); the
+	// choice reaches run as its input.
+	containers bool
 
 	// inputArgs is how what was typed is written in the command, e.g.
 	// "db postgres" as "db --image=postgres". nil writes it as typed.
@@ -341,6 +347,16 @@ func (m Model) pick(i int) (Model, tea.Cmd) {
 	a := m.chosen()
 	m.flags = append([]flag(nil), a.flags...) // a copy: ticking must not change the table
 	m.input = a.inputDefault
+	if a.containers && m.client != nil {
+		return m, loadContainers(m.client, m.target)
+	}
+	return m.afterPick()
+}
+
+// afterPick goes on from the action picked: to its confirm page, or, for
+// an action that only reads and has nothing to set, straight to running.
+func (m Model) afterPick() (Model, tea.Cmd) {
+	a := m.chosen()
 	if !a.changes && len(a.flags) == 0 && a.input == "" {
 		return m.runChosen()
 	}
@@ -526,6 +542,9 @@ func (m Model) onOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case overlayNamespaces:
 		return m.onNamespacesKey(key)
+
+	case overlayContainers:
+		return m.onContainersKey(key)
 	}
 	return m, nil
 }

@@ -42,6 +42,8 @@ func (m Model) content() panelContent {
 	case overlayNamespaces:
 		rows, cursor := m.namespaceRows()
 		return panelContent{rows: rows, cursor: cursor}
+	case overlayContainers:
+		return panelContent{rows: m.containerRows(), cursor: m.overlayCursor}
 	}
 
 	if m.err != nil {
@@ -126,6 +128,8 @@ func (m Model) overlayTitle() string {
 		return "Actions: " + m.target
 	case overlayNamespaces:
 		return "Namespace"
+	case overlayContainers:
+		return m.chosen().name + " " + m.target + ": container"
 	case overlayConfirm, overlayText:
 		if m.tabActions {
 			return m.chosen().name + " in " + m.target
@@ -161,7 +165,7 @@ func (m Model) helpText() string {
 		return "↑↓ move • space tick • enter run • esc back"
 	case overlayText:
 		return "↑↓ pgup pgdn scroll • esc back"
-	case overlayNamespaces:
+	case overlayNamespaces, overlayContainers:
 		return "↑↓ move • enter pick • esc back"
 	}
 	help := "tab focus • ←→ tab • ↑↓ move"

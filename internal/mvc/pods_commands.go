@@ -134,12 +134,17 @@ func podActions() []action {
 		},
 		{
 			key: "o", name: "Logs", about: fmt.Sprintf("the last %d lines of each container, newest at the bottom", logTail),
-			flags:   []flag{{name: flagPrevious}, {name: flagTimestamps}},
-			command: fmt.Sprintf("kubectl logs %%s --all-containers --tail=%d", logTail),
-			run: func(c *k8s.Client, target, _ string, flags []flag) tea.Cmd {
+			flags:      []flag{{name: flagPrevious}, {name: flagTimestamps}},
+			containers: true,
+			inputArgs:  containerArgs,
+			command:    fmt.Sprintf("kubectl logs %%s {input} --tail=%d", logTail),
+			run: func(c *k8s.Client, target, container string, flags []flag) tea.Cmd {
 				namespace, name := splitTarget(target)
+				if container == allContainers {
+					container = ""
+				}
 				return readToEnd("Logs", target, func(ctx context.Context) (string, error) {
-					return c.PodLogs(ctx, namespace, name, ticked(flags, flagPrevious), ticked(flags, flagTimestamps), logTail)
+					return c.PodLogs(ctx, namespace, name, container, ticked(flags, flagPrevious), ticked(flags, flagTimestamps), logTail)
 				})
 			},
 		},

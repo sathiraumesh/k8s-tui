@@ -128,6 +128,10 @@ type Model struct {
 	namespace     string
 	namespaces    []string
 	namespacesErr error
+
+	// containers are the containers of the pod being picked from, for an
+	// action with containers set (containers.go).
+	containers []string
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each

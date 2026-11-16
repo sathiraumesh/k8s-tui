@@ -55,6 +55,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case namespacesLoadedMsg:
 		return m.onNamespacesLoaded(msg), nil
 
+	// The containers of the pod to pick from arrived (containers.go).
+	case containersLoadedMsg:
+		return m.onContainersLoaded(msg)
+
 	// An action finished (actions.go).
 	case actionDoneMsg:
 		return m.onActionDone(msg)

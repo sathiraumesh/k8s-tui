@@ -278,7 +278,7 @@ func TestPodLogsOneContainer(t *testing.T) {
 		}
 		return false, nil, nil
 	})
-	logs, err := NewClientFromClientset(cs).PodLogs(context.Background(), "apps", "web", true, true, 500)
+	logs, err := NewClientFromClientset(cs).PodLogs(context.Background(), "apps", "web", "", true, true, 500)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestPodLogsManyContainers(t *testing.T) {
 	p := fakePod("apps", "web")
 	p.Spec.InitContainers = []corev1.Container{{Name: "init"}}
 	p.Spec.Containers = append(p.Spec.Containers, corev1.Container{Name: "sidecar"})
-	logs, err := NewClientFromClientset(fake.NewClientset(p)).PodLogs(context.Background(), "apps", "web", false, false, 10)
+	logs, err := NewClientFromClientset(fake.NewClientset(p)).PodLogs(context.Background(), "apps", "web", "", false, false, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func TestPodLogsManyContainers(t *testing.T) {
 }
 
 func TestPodLogsMissingPod(t *testing.T) {
-	if _, err := NewClientFromClientset(fake.NewClientset()).PodLogs(context.Background(), "apps", "nope", false, false, 10); err == nil {
+	if _, err := NewClientFromClientset(fake.NewClientset()).PodLogs(context.Background(), "apps", "nope", "", false, false, 10); err == nil {
 		t.Error("err = nil for a pod that doesn't exist")
 	}
 }
