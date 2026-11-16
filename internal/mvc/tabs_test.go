@@ -134,7 +134,8 @@ func TestEveryTabShowsLastUpdate(t *testing.T) {
 // loader's message.
 func TestPlaceholderTabGetsUpdateTime(t *testing.T) {
 	m := New(nil)
-	m.active = 3 // Services
+	m.active = 3
+	m.tabs[3].load = placeholder(tabServices, "kubernetes", "nginx-svc", "redis") // no tab is a placeholder now: make one
 	msg := m.activeTab().load(nil, false, "")()
 	m = press(t, m, msg)
 	if !strings.HasPrefix(m.lastUpdated(), "updated ") {

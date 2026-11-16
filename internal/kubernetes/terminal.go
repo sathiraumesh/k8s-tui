@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // Some things need the terminal to themselves, such as a shell on a node
@@ -116,4 +117,25 @@ func (c *Client) EditPod(namespace, name string) (*exec.Cmd, error) {
 // changed pod template rolls out new pods.
 func (c *Client) EditDeployment(namespace, name string) (*exec.Cmd, error) {
 	return kubectl(withContext([]string{"edit", "deployment", name, "-n", namespace}, c.context))
+}
+
+// EditService returns the command that opens the service in an editor,
+// like `kubectl edit service NAME -n NAMESPACE`.
+func (c *Client) EditService(namespace, name string) (*exec.Cmd, error) {
+	return kubectl(withContext([]string{"edit", "service", name, "-n", namespace}, c.context))
+}
+
+// PortForwardService returns the command that forwards ports of this
+// computer to the service, like `kubectl port-forward service/NAME -n
+// NAMESPACE 8080:80`: http://localhost:8080 then reaches its port 80. It
+// runs until ctrl+c. ports is as kubectl takes it: LOCAL:REMOTE or PORT,
+// several with spaces.
+func (c *Client) PortForwardService(namespace, name, ports string) (*exec.Cmd, error) {
+	return kubectl(PortForwardArgs(namespace, name, ports, c.context))
+}
+
+// PortForwardArgs are the arguments PortForwardService gives kubectl.
+func PortForwardArgs(namespace, name, ports, kubeContext string) []string {
+	args := append([]string{"port-forward", "service/" + name, "-n", namespace}, strings.Fields(ports)...)
+	return withContext(args, kubeContext)
 }

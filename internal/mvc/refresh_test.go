@@ -82,7 +82,8 @@ func TestTickReloadsActiveTabAndSchedulesNext(t *testing.T) {
 // other: the tick reloads it, and only it.
 func TestTickReloadsPlaceholderTab(t *testing.T) {
 	m := fastClient()
-	m.active = 2 // Deployments: placeholder rows
+	m.active = 2
+	m.tabs[2].load = placeholder(tabDeployments, "nginx") // no tab is a placeholder now: make one
 	_, cmd := m.Update(refreshTickMsg{})
 	msgs := runBatch(t, cmd)
 	if !hasLoaded(msgs, tabDeployments) {

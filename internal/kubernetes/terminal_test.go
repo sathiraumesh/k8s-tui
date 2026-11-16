@@ -117,3 +117,10 @@ func TestEditDeployment(t *testing.T) {
 		t.Errorf("edit = %v, err = %v", cmd.Args, err)
 	}
 }
+
+func TestPortForwardArgs(t *testing.T) {
+	want := []string{"port-forward", "service/web", "-n", "apps", "8080:80", "9090:90", "--context=lab"}
+	if got := PortForwardArgs("apps", "web", " 8080:80  9090:90 ", "lab"); !slices.Equal(got, want) {
+		t.Errorf("args = %q, want %q", got, want)
+	}
+}

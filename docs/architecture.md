@@ -17,6 +17,7 @@ internal/
     deployments.go          Deployment, ListDeployments, and the calls of the
                             deployment actions (scale, restart, …)
     images.go               Set image, for pods and deployments
+    services.go             Service, ListServices, endpoints, create and expose
     terminal.go             the kubectl commands that need the terminal: shells, editors
   mvc/                      the UI: state, key handling and drawing
     tabs.go                 allTabs: every tab, its loader and whether it auto refreshes
@@ -33,6 +34,7 @@ internal/
       nodes.go              LoadNodes, NodeActions
       pods.go               LoadPods, PodActions, RunPodActions
       deployments.go        LoadDeployments, DeploymentActions, CreateDeploymentActions
+      services.go           LoadServices, ServiceActions, CreateServiceActions
       resources.go          LoadResources (More tab)
       status.go             how a status column reads: green, yellow or red
     refresh.go              the auto refresh timer and rates (logic only)

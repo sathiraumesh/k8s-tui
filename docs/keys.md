@@ -76,24 +76,29 @@ back to the top.
 ## Actions on a row
 
 `enter` on a row opens what can be done to it; a key (or `enter` on one)
-picks it. Pods and Deployments share keys where the action is the same:
+picks it. Pods, Deployments and Services share keys where the action is
+the same:
 
-| Key | Pods | Deployments |
-|---|---|---|
-| `d` | Describe | Describe |
-| `o` | Logs (asks which container if there are several) | |
-| `s` | Show labels and annotations | Show labels and annotations |
-| `x` | Shell (asks which running container) | |
-| `e` | Edit the YAML | Edit the YAML |
-| `i` | Set image: pick the container (or all), type the image | Set image (same); rolls out new pods |
-| `c` | | Scale: type the replicas |
-| `t` | | Restart, like `kubectl rollout restart` |
-| `l` | Label | Label |
-| `r` | Delete | Delete |
+| Key | Pods | Deployments | Services |
+|---|---|---|---|
+| `d` | Describe | Describe | Describe |
+| `o` | Logs (asks which container if there are several) | | |
+| `s` | Show labels and annotations | Show labels and annotations | Show labels, annotations and selector |
+| `x` | Shell (asks which running container) | | |
+| `e` | Edit the YAML | Edit the YAML | Edit the YAML |
+| `i` | Set image: pick the container (or all), type the image | Set image (same); rolls out new pods | |
+| `c` | | Scale: type the replicas | |
+| `t` | | Restart, like `kubectl rollout restart` | |
+| `p` | | Expose: make a service for it, e.g. `80:8080` | Endpoints: the pods it sends traffic to, ready or not |
+| `f` | | | Port-forward: e.g. `8080:80` makes `localhost:8080` its port 80; `ctrl+c` stops it |
+| `l` | Label | Label | Label |
+| `r` | Delete | Delete | Delete (its pods keep running) |
 
-`+` (or the `+ run` / `+ create` button) makes a new pod or deployment
-from an image. Anything that changes the cluster asks first (`y` runs it)
-and has a `--dry-run=server` tick box.
+`+` (or the `+ run` / `+ create` button) makes something new: a pod or a
+deployment from an image, or a service (ClusterIP, NodePort or
+LoadBalancer) from a name and ports, e.g. `web 80:8080`, for the pods
+labelled `app=web`. Anything that changes the cluster asks first (`y`
+runs it) and has a `--dry-run=server` tick box.
 
 ## Status colors
 
@@ -104,6 +109,7 @@ The status column of a row is colored by how things are:
 | Nodes | STATUS | `Ready` | `Ready,SchedulingDisabled` (cordoned), `Unknown` | `NotReady` |
 | Pods | STATUS | `Running`, `Completed` | `Pending`, `ContainerCreating`, `Init:1/2`, `Terminating` | `CrashLoopBackOff`, `ImagePullBackOff`, `Error`, `OOMKilled`, `Evicted`, … |
 | Deployments | READY | all ready (`3/3`) | some ready (`1/3`) | none ready (`0/3`) |
+| Services | EXTERNAL-IP | | `<pending>` (a load balancer still waiting for its address) | |
 
 A deployment scaled to `0/0` isn't colored.
 
@@ -157,13 +163,14 @@ adds the columns `kubectl get nodes -o wide` shows:
 | NAME, STATUS, VERSION | INTERNAL-IP, EXTERNAL-IP, OS-IMAGE, KERNEL-VERSION, CONTAINER-RUNTIME |
 | Pods: NAME, READY, STATUS, RESTARTS, AGE | IP, NODE, NOMINATED-NODE, READINESS-GATES |
 | Deployments: NAME, READY, UP-TO-DATE, AVAILABLE, AGE | CONTAINERS, IMAGES, SELECTOR |
+| Services: NAME, TYPE, CLUSTER-IP, EXTERNAL-IP, PORT(S), AGE | SELECTOR |
 
 An empty external IP shows as `<none>`, as in kubectl.
 
 Each tab has its own setting: switching wide on for Nodes leaves the
 other tabs as they were. Switching it reloads the tab with the new
 columns; the rows on screen stay until the new ones arrive. Auto refresh
-keeps the tab's setting. (Services has no wide columns yet.)
+keeps the tab's setting.
 
 ## Auto refresh
 

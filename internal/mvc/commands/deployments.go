@@ -134,6 +134,7 @@ func DeploymentActions() []Action {
 				})
 			},
 		},
+		exposeAction(),
 		{
 			Key: "l", Name: "Label", About: "set labels (key=value) or remove them (key-) on the deployment, not its pods",
 			Changes: true,
