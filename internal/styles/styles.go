@@ -17,6 +17,12 @@ const (
 	ColorGreen      lipgloss.Color = "#007A33" // a button that is switched on; dark enough for white text
 	ColorDark       lipgloss.Color = "#585858" // a button that is switched off
 
+	// Text colors of a status, bright enough on the dark background (VS
+	// Code's own: test passed, warning, error).
+	ColorOKText   lipgloss.Color = "#73C991"
+	ColorWarnText lipgloss.Color = "#CCA700"
+	ColorBadText  lipgloss.Color = "#F14C4C"
+
 	// Role names: styles use these instead of the raw colors,
 	// so the theme can be changed by editing just these lines.
 	Accent   = ColorBlue       // highlight: active tab, borders
@@ -27,4 +33,10 @@ const (
 	Bg       = ColorBackground // screen background
 	On       = ColorGreen      // background of a button that is switched on
 	Off      = ColorDark       // background of a button that is switched off
+
+	// A status as it is: fine (Running, Ready), on its way or partly there
+	// (Pending, 1/3), or broken (CrashLoopBackOff, NotReady node).
+	StatusOK   = ColorOKText
+	StatusWarn = ColorWarnText
+	StatusBad  = ColorBadText
 )

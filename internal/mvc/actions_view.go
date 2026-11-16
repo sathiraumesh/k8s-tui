@@ -3,6 +3,7 @@ package mvc
 import (
 	"fmt"
 	"k8s-tui/internal/mvc/commands"
+	"strings"
 )
 
 // Drawing the pages that open on top of the list (actions.go): the action
@@ -28,6 +29,15 @@ type panelContent struct {
 	rows   []string
 	cursor int // the selected row, or -1 for none (a page of text)
 	offset int // the first row on screen
+
+	// status is the column of the rows that is colored, and how (see
+	// tab.status): only on the tab's own rows, nil on a page.
+	status       *commands.StatusColumn
+	statusColumn int // the column's index in these rows
+
+	// highlight, if set, colors a row that isn't selected: the lines of a
+	// page of text, an error (highlight.go).
+	highlight func(row string) string
 }
 
 // content returns what the panel shows now.
@@ -37,9 +47,18 @@ func (m Model) content() panelContent {
 		return panelContent{rows: m.actionRows(), cursor: m.overlayCursor}
 	case overlayConfirm:
 		rows, cursor := m.confirmRows()
-		return panelContent{rows: rows, cursor: cursor}
+		c := panelContent{rows: rows, cursor: cursor}
+		if m.chosen().Changes {
+			c.highlight = func(row string) string { // the warning that it changes the cluster
+				if strings.HasPrefix(row, confirmChangeLine) {
+					return warnText.Render(row)
+				}
+				return row
+			}
+		}
+		return c
 	case overlayText:
-		return panelContent{rows: m.text, cursor: -1, offset: m.textOffset}
+		return panelContent{rows: m.text, cursor: -1, offset: m.textOffset, highlight: highlighter(m.textKind)}
 	case overlayNamespaces:
 		rows, cursor := m.namespaceRows()
 		return panelContent{rows: rows, cursor: cursor}
@@ -48,13 +67,20 @@ func (m Model) content() panelContent {
 	}
 
 	if m.err != nil {
-		return panelContent{rows: []string{"error: " + m.err.Error()}, cursor: m.cursor}
+		return panelContent{rows: []string{"error: " + m.err.Error()}, cursor: -1, highlight: func(row string) string { return badText.Render(row) }}
 	}
 	rows := m.rows()
 	if len(rows) == 0 && m.searchText() != "" {
 		return panelContent{rows: []string{"nothing matches \"" + m.searchText() + "\""}, cursor: -1}
 	}
-	return panelContent{rows: rows, cursor: m.cursor, offset: m.offset}
+	c := panelContent{rows: rows, cursor: m.cursor, offset: m.offset}
+	if s := m.activeTab().status; s != nil {
+		c.status, c.statusColumn = s, s.Column
+		if m.activeTab().namespaced && m.tabNamespace() == allNamespaces {
+			c.statusColumn++ // the NAMESPACE column comes first
+		}
+	}
+	return c
 }
 
 // cursorShown reports whether the selected row is underlined: on a page
@@ -111,12 +137,15 @@ func (m Model) confirmRows() (rows []string, cursor int) {
 	}
 
 	if a.Changes {
-		rows = append(rows, "This changes the cluster. y run • n back")
+		rows = append(rows, confirmChangeLine+" y run • n back")
 	} else {
 		rows = append(rows, "enter run • esc back")
 	}
 	return rows, cursor
 }
+
+// confirmChangeLine starts the last line of the confirm page of a change.
+const confirmChangeLine = "This changes the cluster."
 
 // overlayTitle is written into the panel's top border while a page is open,
 // in place of the buttons, e.g. "Cordon worker1".

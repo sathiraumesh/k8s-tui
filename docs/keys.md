@@ -95,6 +95,31 @@ picks it. Pods and Deployments share keys where the action is the same:
 from an image. Anything that changes the cluster asks first (`y` runs it)
 and has a `--dry-run=server` tick box.
 
+## Status colors
+
+The status column of a row is colored by how things are:
+
+| Tab | Column | Green | Yellow | Red |
+|---|---|---|---|---|
+| Nodes | STATUS | `Ready` | `Ready,SchedulingDisabled` (cordoned), `Unknown` | `NotReady` |
+| Pods | STATUS | `Running`, `Completed` | `Pending`, `ContainerCreating`, `Init:1/2`, `Terminating` | `CrashLoopBackOff`, `ImagePullBackOff`, `Error`, `OOMKilled`, `Evicted`, … |
+| Deployments | READY | all ready (`3/3`) | some ready (`1/3`) | none ready (`0/3`) |
+
+A deployment scaled to `0/0` isn't colored.
+
+The pages of text are colored the same way:
+
+| Page | Red | Yellow | Green |
+|---|---|---|---|
+| Describe | `CrashLoopBackOff`, `Error`, `OOMKilled`, `Failed…`, `BackOff`, `Unhealthy`, `NotReady`, … | `Warning` events (the whole line), `Waiting`, `Pending`, `Terminated`, `Unknown`, … | `Running`, `Completed`, `NewReplicaSetAvailable`, … |
+| Logs | lines with `error`, `fatal`, `panic`, `exception`, `failed`, klog `E…` | lines with `warn`/`warning`, klog `W…` | |
+| A dry run / change | lines removed (`-`) | | lines added (`+`) |
+
+The `==> pod/container <==` headings of logs are in the accent color.
+The line under the panel is red when an action failed and green when it
+worked; "This changes the cluster." on a confirm page is yellow, and a
+tab's `error: …` row red. Show (labels and annotations) isn't colored.
+
 ## Mouse
 
 | Mouse | Does |

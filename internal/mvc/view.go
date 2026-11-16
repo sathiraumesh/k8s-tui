@@ -1,6 +1,7 @@
 package mvc
 
 import (
+	"k8s-tui/internal/mvc/commands"
 	"k8s-tui/internal/styles"
 	"strings"
 
@@ -48,6 +49,40 @@ const panelMarginY = 1
 // top border (the secondary bar) and the first row.
 const panelPaddingTop = 1
 
+// statusColors are the text colors of the status levels.
+var statusColors = map[commands.Level]lipgloss.Color{
+	commands.LevelOK:   styles.StatusOK,
+	commands.LevelWarn: styles.StatusWarn,
+	commands.LevelBad:  styles.StatusBad,
+}
+
+// drawRow draws one row of the panel in base, the selected row's style or
+// none, as wide as the panel if it is selected. Its status column, if it
+// has one, is in the color of its level: the row is drawn in three parts,
+// before, the status and after, as a style drawn around text that is
+// already colored would stop at its color's end.
+func (c panelContent) drawRow(line string, base lipgloss.Style, selected bool, width int) string {
+	pad := func(s lipgloss.Style, w int) lipgloss.Style {
+		if selected {
+			return s.Width(w)
+		}
+		return s
+	}
+	if c.highlight != nil && !selected {
+		return c.highlight(line)
+	}
+	if c.status != nil {
+		if start, end, ok := commands.FieldSpan(line, c.statusColumn); ok {
+			if color, ok := statusColors[c.status.Level(line[start:end])]; ok {
+				before, status, after := line[:start], line[start:end], line[end:]
+				rest := width - lipgloss.Width(before) - lipgloss.Width(status)
+				return base.Render(before) + base.Foreground(color).Render(status) + pad(base, rest).Render(after)
+			}
+		}
+	}
+	return pad(base, width).Render(line)
+}
+
 func (m Model) View() string {
 	if m.width == 0 {
 		return "loading..."
@@ -92,14 +127,14 @@ func (m Model) View() string {
 	lines := make([]string, 0, end-first)
 	for i := first; i < end; i++ {
 		line := cut.Render(rows[i])
+		var base lipgloss.Style // no style: a plain row
 		if i == c.cursor {
-			style := Selected.Width(innerW)
+			base = Selected
 			if m.cursorShown() {
-				style = style.Underline(true)
+				base = base.Underline(true)
 			}
-			line = style.Render(line)
 		}
-		lines = append(lines, line)
+		lines = append(lines, c.drawRow(line, base, i == c.cursor, innerW))
 	}
 	// Height includes the padding, so the empty row on top is added to it.
 	body := Panel.PaddingTop(panelPaddingTop).Width(panelW).Height(panelH + panelPaddingTop).Render(strings.Join(lines, "\n"))
@@ -129,6 +164,9 @@ func (m Model) View() string {
 
 	tabBar = fit.Render(tabBar)
 	footer := fit.Render(Help.Render(m.helpText()))
+	if m.notice != "" {
+		footer = fit.Render(noticeStyle(m.notice).Render(m.notice)) // red if it failed, green if it worked
+	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, tabBar, body, footer)
 }

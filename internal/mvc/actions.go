@@ -174,6 +174,7 @@ func (m Model) onActionDone(msg commands.ActionDoneMsg) (Model, tea.Cmd) {
 		m.notice = what + ": dry run passed, nothing changed"
 		if msg.Text != "" {
 			m = m.showText(msg.Text) // what it would change
+			m.textKind = textKindOf(msg)
 		}
 		return m, nil // nothing changed, so nothing to reload
 	case msg.Changed:
@@ -182,6 +183,7 @@ func (m Model) onActionDone(msg commands.ActionDoneMsg) (Model, tea.Cmd) {
 	}
 	m.notice = ""
 	m = m.showText(msg.Text)
+	m.textKind = textKindOf(msg)
 	if msg.AtEnd {
 		m.textOffset = max(len(m.text)-m.listHeight(), 0) // the last lines on screen
 	}

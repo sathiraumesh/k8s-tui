@@ -62,6 +62,10 @@ type tab struct {
 	ownTitle  string
 	ownTarget string
 
+	// status is the column of the rows colored by how things are (green,
+	// yellow, red), e.g. a pod's STATUS. nil for none.
+	status *commands.StatusColumn
+
 	// namespaced is whether the tab shows things that are in a namespace
 	// (pods, not nodes). It then has the namespace button, and loads from
 	// the namespace picked there (namespace.go). Its command gets
@@ -82,6 +86,7 @@ func allTabs() []tab {
 			load:        commands.LoadNodes,
 			command:     "kubectl get nodes",
 			actions:     commands.NodeActions(),
+			status:      &commands.NodeStatus,
 			autoRefresh: true,
 		},
 		{
@@ -90,6 +95,7 @@ func allTabs() []tab {
 			command:       "kubectl get pods",
 			namespaced:    true,
 			actions:       commands.PodActions(),
+			status:        &commands.PodStatus,
 			rowTarget:     commands.NamespacedTarget,
 			commandTarget: commands.NamespacedArgs,
 			own:           commands.RunPodActions(),
@@ -104,6 +110,7 @@ func allTabs() []tab {
 			command:       "kubectl get deployments",
 			namespaced:    true,
 			actions:       commands.DeploymentActions(),
+			status:        &commands.DeploymentReady,
 			rowTarget:     commands.NamespacedTarget,
 			commandTarget: commands.NamespacedArgs,
 			own:           commands.CreateDeploymentActions(),

@@ -97,6 +97,7 @@ type Model struct {
 	// textOffset how far it is scrolled down.
 	text       []string
 	textOffset int
+	textKind   textKind // how its lines are colored (highlight.go)
 
 	// notice is a one-line message shown in place of the help line, e.g.
 	// "Cordon worker1: done". It is cleared by the next key press.
