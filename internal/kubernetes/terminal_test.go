@@ -84,12 +84,12 @@ func TestEditNodeWithoutKubectl(t *testing.T) {
 }
 
 func TestPodShellArgs(t *testing.T) {
-	if got := PodShellArgs("apps", "web", false, ""); !slices.Equal(got, []string{"exec", "-it", "web", "-n", "apps", "--", "sh"}) {
+	if got := PodShellArgs("apps", "web", "", false, ""); !slices.Equal(got, []string{"exec", "-it", "web", "-n", "apps", "--", "sh"}) {
 		t.Errorf("sh: %v", got)
 	}
 	// The context goes before the "--": after it, everything is for the shell.
 	want := []string{"exec", "-it", "web", "-n", "apps", "--context=lab", "--", "bash"}
-	if got := PodShellArgs("apps", "web", true, "lab"); !slices.Equal(got, want) {
+	if got := PodShellArgs("apps", "web", "", true, "lab"); !slices.Equal(got, want) {
 		t.Errorf("bash: %v, want %v", got, want)
 	}
 }
@@ -99,5 +99,12 @@ func TestEditPod(t *testing.T) {
 	cmd, err := NewClientFromClientset(fake.NewClientset()).EditPod("apps", "web")
 	if err != nil || !slices.Equal(cmd.Args, []string{"/bin/kubectl", "edit", "pod", "web", "-n", "apps"}) {
 		t.Errorf("command = %v, err = %v", cmd.Args, err)
+	}
+}
+
+func TestPodShellArgsContainer(t *testing.T) {
+	want := []string{"exec", "-it", "web", "-n", "apps", "-c", "sidecar", "--", "sh"}
+	if got := PodShellArgs("apps", "web", "sidecar", false, ""); !slices.Equal(got, want) {
+		t.Errorf("args = %q, want %q", got, want)
 	}
 }

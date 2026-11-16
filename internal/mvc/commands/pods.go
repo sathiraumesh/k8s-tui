@@ -160,12 +160,15 @@ func PodActions() []Action {
 			},
 		},
 		{
-			Key: "x", Name: "Shell", About: "a shell in the pod's first container; the image needs sh (or bash)",
-			Flags:   []Flag{{Name: flagBash, Off: flagSh}},
-			Command: "kubectl exec -it %s",
-			Run: func(c *k8s.Client, target, _ string, flags []Flag) tea.Cmd {
+			Key: "x", Name: "Shell", About: "a shell in one of the pod's containers; the image needs sh (or bash)",
+			Flags:        []Flag{{Name: flagBash, Off: flagSh}},
+			Containers:   true,
+			OneContainer: true,
+			InputArgs:    ContainerArgs,
+			Command:      "kubectl exec -it %s {input}",
+			Run: func(c *k8s.Client, target, container string, flags []Flag) tea.Cmd {
 				namespace, name := SplitTarget(target)
-				cmd, err := c.PodShell(namespace, name, Ticked(flags, flagBash))
+				cmd, err := c.PodShell(namespace, name, container, Ticked(flags, flagBash))
 				return InTerminal("Shell", target, "Shell in "+target+" closed", true, cmd, err)
 			},
 		},

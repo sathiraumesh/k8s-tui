@@ -81,22 +81,26 @@ func NodeShellArgs(name, image string, sysadmin bool, kubeContext string) []stri
 	return withContext(args, kubeContext)
 }
 
-// PodShell returns the command that opens a shell in the pod's first
-// container, like `kubectl exec -it NAME -n NAMESPACE -- sh` (or bash).
-// The image must have that shell: busybox and alpine have sh, not bash.
-func (c *Client) PodShell(namespace, name string, bash bool) (*exec.Cmd, error) {
-	return kubectl(PodShellArgs(namespace, name, bash, c.context))
+// PodShell returns the command that opens a shell in a container of the
+// pod, like `kubectl exec -it NAME -n NAMESPACE -c CONTAINER -- sh` (or
+// bash). With container "" it is the pod's default container, usually the
+// first. The image must have that shell: busybox and alpine have sh, not bash.
+func (c *Client) PodShell(namespace, name, container string, bash bool) (*exec.Cmd, error) {
+	return kubectl(PodShellArgs(namespace, name, container, bash, c.context))
 }
 
 // PodShellArgs are the arguments PodShell gives kubectl. The context comes
 // before the "--": everything after it is for the shell.
-func PodShellArgs(namespace, name string, bash bool, kubeContext string) []string {
+func PodShellArgs(namespace, name, container string, bash bool, kubeContext string) []string {
 	shell := "sh"
 	if bash {
 		shell = "bash"
 	}
-	args := withContext([]string{"exec", "-it", name, "-n", namespace}, kubeContext)
-	return append(args, "--", shell)
+	args := []string{"exec", "-it", name, "-n", namespace}
+	if container != "" {
+		args = append(args, "-c", container)
+	}
+	return append(withContext(args, kubeContext), "--", shell)
 }
 
 // EditPod returns the command that opens the pod in an editor, like

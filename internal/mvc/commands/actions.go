@@ -83,7 +83,12 @@ type Action struct {
 	// Containers is whether the action is for one container of a pod. If the
 	// pod has more than one, a picker asks which first (Containers.go); the
 	// choice reaches run as its input.
-	Containers bool
+	//
+	// OneContainer is for an action that can't be for all of them, such as
+	// a shell: the picker then offers only the containers that are running,
+	// and a pod with one container gives no input.
+	Containers   bool
+	OneContainer bool
 
 	// InputArgs is how what was typed is written in the command, e.g.
 	// "db postgres" as "db --image=postgres". nil writes it as typed.

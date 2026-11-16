@@ -17,7 +17,9 @@ import (
 //	several       ──▶ picker: "all containers", then each ──enter──▶ confirm page / run
 //
 // The choice goes to the action as its input: a container's name, or
-// allContainers.
+// commands.AllContainers. An action that is for one container only, such
+// as Shell (OneContainer), has no "all containers" choice, and is offered
+// just the containers that are running.
 
 // containersLoadedMsg brings the containers of the pod to pick from.
 type containersLoadedMsg struct {
@@ -27,12 +29,13 @@ type containersLoadedMsg struct {
 }
 
 // loadContainers calls the API for the containers of the pod target.
-func loadContainers(c *k8s.Client, target string) tea.Cmd {
+// With running, only the containers that are running now.
+func loadContainers(c *k8s.Client, target string, running bool) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()
 		namespace, name := commands.SplitTarget(target)
-		names, err := c.PodContainers(ctx, namespace, name)
+		names, err := c.PodContainers(ctx, namespace, name, running)
 		return containersLoadedMsg{target: target, names: names, err: err}
 	}
 }
@@ -46,6 +49,9 @@ func (m Model) onContainersLoaded(msg containersLoadedMsg) (Model, tea.Cmd) {
 	}
 	if msg.err != nil || len(msg.names) < 2 {
 		m.input = commands.AllContainers
+		if m.chosen().OneContainer {
+			m.input = "" // the pod's only container: kubectl needs no -c
+		}
 		return m.afterPick()
 	}
 	m.containers = msg.names
@@ -54,8 +60,12 @@ func (m Model) onContainersLoaded(msg containersLoadedMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// containerChoices are what the picker offers: all containers, then each.
+// containerChoices are what the picker offers: all containers (unless the
+// action is for one only), then each.
 func (m Model) containerChoices() []string {
+	if m.chosen().OneContainer {
+		return m.containers
+	}
 	return append([]string{commands.AllContainers}, m.containers...)
 }
 
@@ -79,7 +89,8 @@ func (m Model) onContainersKey(key string) (tea.Model, tea.Cmd) {
 
 // containerRows are the picker's rows.
 func (m Model) containerRows() []string {
-	rows := m.containerChoices()
-	rows[0] = "all containers"
-	return rows
+	if m.chosen().OneContainer {
+		return m.containers
+	}
+	return append([]string{"all containers"}, m.containers...)
 }

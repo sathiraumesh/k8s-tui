@@ -291,7 +291,7 @@ func (c *Client) PodLogs(ctx context.Context, namespace, name, container string,
 	containers := []string{container}
 	if container == "" {
 		var err error
-		if containers, err = c.PodContainers(ctx, namespace, name); err != nil {
+		if containers, err = c.PodContainers(ctx, namespace, name, false); err != nil {
 			return "", err
 		}
 	}
@@ -320,13 +320,24 @@ func (c *Client) PodLogs(ctx context.Context, namespace, name, container string,
 }
 
 // PodContainers returns the names of the pod's containers: the init
-// containers first, then the others.
-func (c *Client) PodContainers(ctx context.Context, namespace, name string) ([]string, error) {
+// containers first, then the others. With running, only those that are
+// running now: the ones a shell can be opened in.
+func (c *Client) PodContainers(ctx context.Context, namespace, name string, running bool) ([]string, error) {
 	pod, err := c.clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 	var containers []string
+	if running {
+		for _, statuses := range [][]corev1.ContainerStatus{pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses} {
+			for _, cs := range statuses {
+				if cs.State.Running != nil {
+					containers = append(containers, cs.Name)
+				}
+			}
+		}
+		return containers, nil
+	}
 	for _, ct := range pod.Spec.InitContainers {
 		containers = append(containers, ct.Name)
 	}

@@ -112,7 +112,7 @@ func (m Model) pick(i int) (Model, tea.Cmd) {
 	m.flags = append([]commands.Flag(nil), a.Flags...) // a copy: ticking must not change the table
 	m.input = a.InputDefault
 	if a.Containers && m.client != nil {
-		return m, loadContainers(m.client, m.target)
+		return m, loadContainers(m.client, m.target, a.OneContainer)
 	}
 	return m.afterPick()
 }

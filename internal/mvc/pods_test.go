@@ -124,7 +124,7 @@ func openPodAction(t *testing.T, k string) (Model, *fake.Clientset) {
 	t.Helper()
 	m, cs := podsOnScreen(t)
 	m = press(t, m, down, down, down, enterKey, key(k))
-	if k == "o" { // the pod's containers load first: it has one
+	if k == "o" || k == "x" { // the pod's containers load first: it has one
 		m = press(t, m, containersLoadedMsg{target: "default/web", names: []string{"web"}})
 	}
 	return m, cs
@@ -144,6 +144,20 @@ func TestPodLogsPickContainer(t *testing.T) {
 	m = press(t, m, down, down, enterKey) // sidecar
 	if m.overlay != overlayConfirm || m.kubectlCommand() != "kubectl logs web -n default --container=sidecar --tail=500" {
 		t.Errorf("overlay = %d, command = %q", m.overlay, m.kubectlCommand())
+	}
+}
+
+// Shell asks which container too, without "all containers".
+func TestPodShellPickContainer(t *testing.T) {
+	m, _ := podsOnScreen(t)
+	m = press(t, m, down, down, down, enterKey, key("x"))
+	m = press(t, m, containersLoadedMsg{target: "default/web", names: []string{"app", "sidecar"}})
+	if got := m.containerRows(); m.overlay != overlayContainers || len(got) != 2 || got[0] != "app" {
+		t.Fatalf("overlay = %d, rows = %q", m.overlay, got)
+	}
+	m = press(t, m, down, enterKey) // sidecar
+	if m.kubectlCommand() != "kubectl exec -it web -n default --container=sidecar -- sh" {
+		t.Errorf("command = %q", m.kubectlCommand())
 	}
 }
 
