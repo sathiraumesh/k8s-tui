@@ -95,6 +95,23 @@ picks it. Pods and Deployments share keys where the action is the same:
 from an image. Anything that changes the cluster asks first (`y` runs it)
 and has a `--dry-run=server` tick box.
 
+## Mouse
+
+| Mouse | Does |
+|---|---|
+| wheel | scrolls one row a step: the list, a page of text, or a page's list. It stays in the panel: at the top it doesn't go up to the buttons |
+| click a tab | switches to it (and closes a page that is open) |
+| click a button | presses it: `ns`, `wide`, `refresh`, `+ run` / `+ create`, `/ search` |
+| click a row | selects it; click it again to open its actions |
+| click an action, namespace or container | picks it |
+| click the text field | puts the cursor there to type |
+| click a tick box | ticks or unticks it |
+| click the last line (`y run` / `enter run`) | runs the action |
+| right click | back, like `esc` |
+
+While the app reads the mouse, select text with `shift`+drag (most
+terminals).
+
 ## Anywhere
 
 | Key | Does |

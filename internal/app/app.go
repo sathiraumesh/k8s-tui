@@ -30,7 +30,8 @@ func New() *App {
 
 // Run starts the TUI full-screen and blocks until the user quits.
 func (a *App) Run() error {
-	p := tea.NewProgram(a.state, tea.WithAltScreen())
+	// The mouse is read so its wheel scrolls one row a step (mvc/mouse.go).
+	p := tea.NewProgram(a.state, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }

@@ -67,6 +67,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commands.ActionDoneMsg:
 		return m.onActionDone(msg)
 
+	// The mouse wheel scrolls the panel (mouse.go).
+	case tea.MouseMsg:
+		return m.onMouse(msg)
+
 	case tea.KeyMsg:
 		if m.splash {
 			// Nothing is on screen to act on yet; only quitting works.

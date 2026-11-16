@@ -24,6 +24,7 @@ internal/
     controller.go           Update: what each message and key does
     view.go                 View: draws the screen; styles of tabs, panel, rows
     keys.go                 every key binding, as constants
+    mouse.go                the mouse: wheel scrolling, clicks on tabs, buttons, rows and pages
     messages.go             the refresh rates and the refresh tick message
     commands/               what each tab loads and does (its own package)
       actions.go            Action, Flag, Read / Change / InTerminal, and the
