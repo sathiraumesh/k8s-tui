@@ -4,6 +4,7 @@ import (
 	"context"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -21,7 +22,7 @@ import (
 
 // allNamespaces is the namespace setting for every namespace, like
 // `kubectl get pods --all-namespaces`.
-const allNamespaces = ""
+const allNamespaces = commands.AllNamespaces
 
 // allNamespacesChoice is the first choice of the picker.
 const allNamespacesChoice = "all namespaces"

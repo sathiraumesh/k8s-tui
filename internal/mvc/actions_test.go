@@ -9,6 +9,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,18 +29,18 @@ func nodesOnScreen(t *testing.T) (Model, *fake.Clientset) {
 	t.Helper()
 	cs := fake.NewClientset(readyNode("worker1"), readyNode("worker2"))
 	m := sized(t, New(k8s.NewClientFromClientset(cs)), 100, 24)
-	m = press(t, m, itemsLoadedMsg{tab: tabNodes, rows: []string{
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabNodes, Rows: []string{
 		"worker1   Ready   v1.37.2",
 		"worker2   Ready   v1.37.2",
-	}, at: time.Now()})
+	}, At: time.Now()})
 	return press(t, m, down, down, down), cs // tabs → buttons → list row 0 → row 1
 }
 
 // actionIndex is where the node action called name is in the action list.
 func actionIndex(t *testing.T, name string) int {
 	t.Helper()
-	for i, a := range nodeActions() {
-		if a.name == name {
+	for i, a := range commands.NodeActions() {
+		if a.Name == name {
 			return i
 		}
 	}
@@ -76,7 +77,7 @@ func TestEnterDoesNothingWhileLoading(t *testing.T) {
 func TestEnterDoesNothingOnTabWithoutActions(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m.active = 2 // Deployments: no actions
-	m = press(t, m, itemsLoadedMsg{tab: tabDeployments, rows: []string{"nginx"}, at: time.Now()})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabDeployments, Rows: []string{"nginx"}, At: time.Now()})
 	if m = press(t, m, enterKey); m.overlay != overlayNone {
 		t.Error("actions opened on a tab that has none")
 	}
@@ -96,8 +97,8 @@ func TestRowName(t *testing.T) {
 		"  spaced  x":               "spaced",
 		"":                          "",
 	} {
-		if got := rowName(row); got != want {
-			t.Errorf("rowName(%q) = %q, want %q", row, got, want)
+		if got := commands.RowName(row); got != want {
+			t.Errorf("commands.RowName(%q) = %q, want %q", row, got, want)
 		}
 	}
 }
@@ -107,14 +108,14 @@ func TestRowName(t *testing.T) {
 func TestActionListMovesAndCloses(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = press(t, m, enterKey)
-	for range nodeActions() { // one more ↓ than needed: stops on the last
+	for range commands.NodeActions() { // one more ↓ than needed: stops on the last
 		m = press(t, m, down)
 	}
-	if m.overlayCursor != len(nodeActions())-1 {
+	if m.overlayCursor != len(commands.NodeActions())-1 {
 		t.Errorf("cursor = %d, want the last action", m.overlayCursor)
 	}
 	m = press(t, m, up)
-	if m.overlayCursor != len(nodeActions())-2 {
+	if m.overlayCursor != len(commands.NodeActions())-2 {
 		t.Errorf("cursor = %d after ↑", m.overlayCursor)
 	}
 	if m = press(t, m, escKey); m.overlay != overlayNone || m.focus != focusList {
@@ -134,8 +135,8 @@ func TestActionListIgnoresOtherKeys(t *testing.T) {
 func TestActionKeyPicks(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = press(t, m, enterKey, key("c"))
-	if m.overlay != overlayConfirm || m.chosen().name != "Cordon" {
-		t.Errorf("overlay = %d, chosen = %q, want the Cordon confirm page", m.overlay, m.chosen().name)
+	if m.overlay != overlayConfirm || m.chosen().Name != "Cordon" {
+		t.Errorf("overlay = %d, chosen = %q, want the Cordon confirm page", m.overlay, m.chosen().Name)
 	}
 }
 
@@ -144,14 +145,14 @@ func TestActionKeyPicks(t *testing.T) {
 func TestSpaceTicksFlag(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = press(t, m, enterKey, key("c"), spaceKey)
-	if !ticked(m.flags, flagDryRun) {
+	if !commands.Ticked(m.flags, commands.FlagDryRun) {
 		t.Fatal("--dry-run=server not ticked after space")
 	}
 	if m.kubectlCommand() != "kubectl cordon worker2 --dry-run=server" {
 		t.Errorf("command = %q, want the dry-run flag added", m.kubectlCommand())
 	}
 	// Ticking must not change the action's defaults.
-	if nodeActions()[actionIndex(t, "Cordon")].flags[0].on {
+	if commands.NodeActions()[actionIndex(t, "Cordon")].Flags[0].On {
 		t.Error("ticking changed the action table's default")
 	}
 }
@@ -172,7 +173,7 @@ func TestEnterDoesNotRunChange(t *testing.T) {
 func TestNGoesBackToActions(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = press(t, m, enterKey, key("c"), key("n"))
-	if m.overlay != overlayActions || m.chosen().name != "Cordon" || m.overlayCursor != m.chosenAction {
+	if m.overlay != overlayActions || m.chosen().Name != "Cordon" || m.overlayCursor != m.chosenAction {
 		t.Errorf("overlay = %d, cursor = %d, want the action list on Cordon", m.overlay, m.overlayCursor)
 	}
 }
@@ -222,7 +223,7 @@ func TestUncordonRuns(t *testing.T) {
 
 func TestDryRunNotice(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m = press(t, m, actionDoneMsg{action: "Cordon", target: "worker2", changed: true, dryRun: true})
+	m = press(t, m, commands.ActionDoneMsg{Action: "Cordon", Target: "worker2", Changed: true, DryRun: true})
 	if m.notice != "Cordon worker2: dry run passed, nothing changed" {
 		t.Errorf("notice = %q", m.notice)
 	}
@@ -230,7 +231,7 @@ func TestDryRunNotice(t *testing.T) {
 
 func TestFailedActionNotice(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m = press(t, m, actionDoneMsg{action: "Cordon", target: "worker2", changed: true, err: errors.New("forbidden")})
+	m = press(t, m, commands.ActionDoneMsg{Action: "Cordon", Target: "worker2", Changed: true, Err: errors.New("forbidden")})
 	if m.notice != "Cordon worker2 failed: forbidden" {
 		t.Errorf("notice = %q", m.notice)
 	}
@@ -273,7 +274,7 @@ func TestTextPageScrolls(t *testing.T) {
 	for i := range lines {
 		lines[i] = "line"
 	}
-	m = press(t, m, actionDoneMsg{action: "Describe", target: "worker2", text: strings.Join(lines, "\n")})
+	m = press(t, m, commands.ActionDoneMsg{Action: "Describe", Target: "worker2", Text: strings.Join(lines, "\n")})
 	m = press(t, m, down, down, pgDown)
 	if want := 2 + m.listHeight(); m.textOffset != want {
 		t.Errorf("textOffset = %d, want %d", m.textOffset, want)
@@ -349,14 +350,14 @@ func TestHelpLineFollowsPage(t *testing.T) {
 // Every node action has a key, a name, a kubectl command and a run.
 func TestNodeActionsComplete(t *testing.T) {
 	seen := map[string]bool{}
-	for _, a := range nodeActions() {
-		if a.key == "" || a.name == "" || !strings.HasPrefix(a.command, "kubectl ") || a.run == nil {
+	for _, a := range commands.NodeActions() {
+		if a.Key == "" || a.Name == "" || !strings.HasPrefix(a.Command, "kubectl ") || a.Run == nil {
 			t.Errorf("incomplete action %+v", a)
 		}
-		if seen[a.key] {
-			t.Errorf("key %q used twice", a.key)
+		if seen[a.Key] {
+			t.Errorf("key %q used twice", a.Key)
 		}
-		seen[a.key] = true
+		seen[a.Key] = true
 	}
 }
 
@@ -414,7 +415,7 @@ func TestTextFieldToFlags(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = typeText(t, press(t, m, enterKey, key("l")), "env=prod")
 	m = press(t, m, enterKey, down, spaceKey) // to --overwrite, then --dry-run=server
-	if m.typing() || !ticked(m.flags, flagDryRun) || ticked(m.flags, flagOverwrite) {
+	if m.typing() || !commands.Ticked(m.flags, commands.FlagDryRun) || commands.Ticked(m.flags, commands.FlagOverwrite) {
 		t.Errorf("typing = %v, flags = %+v, want only --dry-run=server ticked", m.typing(), m.flags)
 	}
 	if m.kubectlCommand() != "kubectl label node worker2 env=prod --dry-run=server" {
@@ -551,12 +552,12 @@ func TestLabelDryRunShowsChange(t *testing.T) {
 }
 
 func TestChangeText(t *testing.T) {
-	got := changeText("Labels", []string{"keep=1", "old=x"}, []string{"env=prod", "keep=1"})
+	got := commands.ChangeText("Labels", []string{"keep=1", "old=x"}, []string{"env=prod", "keep=1"})
 	want := "Labels after the change:\n\n+ env=prod\n  keep=1\n- old=x"
 	if got != want {
 		t.Errorf("changeText =\n%s\nwant\n%s", got, want)
 	}
-	if got := changeText("Taints", nil, nil); !strings.HasSuffix(got, "(none)") {
+	if got := commands.ChangeText("Taints", nil, nil); !strings.HasSuffix(got, "(none)") {
 		t.Errorf("no taints: %q", got)
 	}
 }
@@ -595,11 +596,11 @@ func TestShellNeedsYes(t *testing.T) {
 // left; the list reloads.
 func TestShellClosed(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	next, cmd := m.Update(actionDoneMsg{action: "Shell", target: "worker2", terminal: true, closed: "Shell on worker2 closed; its debug pod is still there, delete it when you are done"})
+	next, cmd := m.Update(commands.ActionDoneMsg{Action: "Shell", Target: "worker2", Terminal: true, Closed: "Shell on worker2 closed; its debug pod is still there, delete it when you are done"})
 	if m = next.(Model); !strings.HasPrefix(m.notice, "Shell on worker2 closed") || cmd == nil {
 		t.Errorf("notice = %q, reload = %v", m.notice, cmd != nil)
 	}
-	next, _ = m.Update(actionDoneMsg{action: "Shell", target: "worker2", terminal: true, err: errors.New("kubectl not found")})
+	next, _ = m.Update(commands.ActionDoneMsg{Action: "Shell", Target: "worker2", Terminal: true, Err: errors.New("kubectl not found")})
 	if m = next.(Model); !strings.Contains(m.notice, "failed: kubectl not found") {
 		t.Errorf("notice = %q", m.notice)
 	}
@@ -607,8 +608,8 @@ func TestShellClosed(t *testing.T) {
 
 // Not finding kubectl is reported, for a shell too.
 func TestInTerminalNoKubectl(t *testing.T) {
-	cmd := inTerminal("Shell", "worker2", "", true, nil, errors.New("kubectl not found"))
-	if msg := cmd().(actionDoneMsg); msg.err == nil || !msg.terminal {
+	cmd := commands.InTerminal("Shell", "worker2", "", true, nil, errors.New("kubectl not found"))
+	if msg := cmd().(commands.ActionDoneMsg); msg.Err == nil || !msg.Terminal {
 		t.Errorf("msg = %+v, want the error", msg)
 	}
 }
@@ -629,7 +630,7 @@ func TestEditRunsAtOnce(t *testing.T) {
 func TestEditClosed(t *testing.T) {
 	m, _ := nodesOnScreen(t)
 	m = press(t, m, enterKey, key("e"))
-	next, reload := m.Update(actionDoneMsg{action: "Edit", target: "worker2", terminal: true, closed: "Edit worker2: editor closed"})
+	next, reload := m.Update(commands.ActionDoneMsg{Action: "Edit", Target: "worker2", Terminal: true, Closed: "Edit worker2: editor closed"})
 	if m = next.(Model); m.overlay != overlayNone || m.notice != "Edit worker2: editor closed" || reload == nil {
 		t.Errorf("overlay = %d, notice = %q, reload = %v", m.overlay, m.notice, reload != nil)
 	}
@@ -642,11 +643,11 @@ func TestInTerminalExitCode(t *testing.T) {
 		shell   bool
 		wantErr bool
 	}{{true, false}, {false, true}} {
-		if err := terminalError(tc.shell, exitErr); (err != nil) != tc.wantErr {
+		if err := commands.TerminalError(tc.shell, exitErr); (err != nil) != tc.wantErr {
 			t.Errorf("shell = %v: err = %v, want error %v", tc.shell, err, tc.wantErr)
 		}
 	}
-	if terminalError(false, nil) != nil {
+	if commands.TerminalError(false, nil) != nil {
 		t.Error("a clean exit is an error")
 	}
 }

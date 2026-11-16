@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"k8s.io/client-go/kubernetes/fake"
@@ -82,8 +83,8 @@ func TestWideReloadsWithWideColumns(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("w returned no command, want a reload")
 	}
-	msg, ok := cmd().(itemsLoadedMsg)
-	if !ok || msg.tab != "Nodes" || !msg.wide {
+	msg, ok := cmd().(commands.ItemsLoadedMsg)
+	if !ok || msg.Tab != "Nodes" || !msg.Wide {
 		t.Errorf("reload sent %#v, want a wide load of Nodes", msg)
 	}
 }
@@ -93,7 +94,7 @@ func TestRefreshKeepsWide(t *testing.T) {
 	m := press(t, fastClient(), wideKey)
 	msgs := runBatch(t, func() tea.Msg { _, c := m.Update(refreshTickMsg{gen: m.tickGen}); return c() })
 	for _, msg := range msgs {
-		if l, ok := msg.(itemsLoadedMsg); ok && !l.wide {
+		if l, ok := msg.(commands.ItemsLoadedMsg); ok && !l.Wide {
 			t.Errorf("refresh loaded %#v without wide columns", l)
 		}
 	}
@@ -106,11 +107,11 @@ func TestRefreshKeepsWide(t *testing.T) {
 // on their way) are dropped; the reload the switch started brings the right ones.
 func TestStaleWideRowsDropped(t *testing.T) {
 	m := press(t, testModel(), wideKey) // wide is now on
-	m = press(t, m, itemsLoadedMsg{tab: "Nodes", rows: []string{"narrow-row"}, wide: false})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"narrow-row"}, Wide: false})
 	if strings.Contains(strings.Join(m.items["Nodes"], ","), "narrow-row") {
 		t.Error("narrow rows replaced the list after wide was turned on")
 	}
-	m = press(t, m, itemsLoadedMsg{tab: "Nodes", rows: []string{"wide-row"}, wide: true})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"wide-row"}, Wide: true})
 	if got := m.items["Nodes"]; len(got) != 1 || got[0] != "wide-row" {
 		t.Errorf("rows = %q, want [wide-row]", got)
 	}
@@ -126,7 +127,7 @@ var twoNodes = []k8s.Node{
 }
 
 func TestNodeRowsNarrowHasNoWideColumns(t *testing.T) {
-	for _, row := range nodeRows(twoNodes, false) {
+	for _, row := range commands.NodeRows(twoNodes, false) {
 		for _, wide := range []string{"10.0.0.", "Ubuntu", "6.8.0", "containerd"} {
 			if strings.Contains(row, wide) {
 				t.Errorf("narrow row %q has wide column %q", row, wide)
@@ -136,7 +137,7 @@ func TestNodeRowsNarrowHasNoWideColumns(t *testing.T) {
 }
 
 func TestNodeRowsWideHasAllColumns(t *testing.T) {
-	rows := nodeRows(twoNodes, true)
+	rows := commands.NodeRows(twoNodes, true)
 	for i, want := range [][]string{
 		{"controlplane", "Ready", "v1.37.2", "10.0.0.10", "<none>", "Ubuntu 24.04 LTS", "6.8.0", "containerd://2.0.0"},
 		{"worker1", "Ready", "v1.37.2", "10.0.0.11", "203.0.113.11", "Ubuntu 24.04 LTS", "6.8.0", "containerd://2.0.0"},
@@ -151,7 +152,7 @@ func TestNodeRowsWideHasAllColumns(t *testing.T) {
 
 // Every wide column starts at the same place on every row.
 func TestNodeRowsWideAligned(t *testing.T) {
-	rows := nodeRows(twoNodes, true)
+	rows := commands.NodeRows(twoNodes, true)
 	for _, cell := range []string{"Ready", "v1.37.2", "Ubuntu", "6.8.0", "containerd"} {
 		if strings.Index(rows[0], cell) != strings.Index(rows[1], cell) {
 			t.Errorf("column %q not aligned:\n%q\n%q", cell, rows[0], rows[1])
@@ -160,7 +161,7 @@ func TestNodeRowsWideAligned(t *testing.T) {
 }
 
 func TestAlignColumns(t *testing.T) {
-	got := alignColumns([][]string{{"a", "bb", "c"}, {"aaa", "b", "c"}})
+	got := commands.AlignColumns([][]string{{"a", "bb", "c"}, {"aaa", "b", "c"}})
 	want := []string{"a     bb   c", "aaa   b    c"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Errorf("alignColumns =\n%q\nwant\n%q", got, want)

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -89,7 +90,7 @@ type Model struct {
 	// flags are its flags as ticked on the confirm page, and input is what
 	// was typed in its text field, e.g. "env=prod".
 	chosenAction int
-	flags        []flag
+	flags        []commands.Flag
 	input        string
 
 	// text is the lines of the text page (what a read action returned), and

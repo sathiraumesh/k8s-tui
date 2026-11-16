@@ -8,42 +8,12 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
-
-var podsNow = time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
-
-func TestPodRows(t *testing.T) {
-	pods := []k8s.Pod{
-		{Namespace: "default", Name: "web", Ready: "1/1", Status: "Running", CreatedAt: podsNow.Add(-3 * time.Hour), IP: "10.0.0.5", Node: "worker1"},
-		{Namespace: "kube-system", Name: "dns", Ready: "0/1", Status: "CrashLoopBackOff", Restarts: 4, LastRestart: podsNow.Add(-5 * time.Minute), CreatedAt: podsNow.Add(-8 * 24 * time.Hour)},
-	}
-	got := podRows(pods, false, true, podsNow)
-	want := []string{
-		"default       web   1/1   Running            0            3h",
-		"kube-system   dns   0/1   CrashLoopBackOff   4 (5m ago)   8d",
-	}
-	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Errorf("rows =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-	}
-
-	wide := podRows(pods, true, true, podsNow)
-	if !strings.HasSuffix(wide[0], "10.0.0.5   worker1   <none>   <none>") || !strings.HasSuffix(wide[1], "8d   <none>     <none>    <none>   <none>") {
-		t.Errorf("wide rows =\n%s", strings.Join(wide, "\n"))
-	}
-}
-
-func TestPodAge(t *testing.T) {
-	if got := age(time.Time{}, podsNow); got != "<unknown>" {
-		t.Errorf("age of zero time = %q", got)
-	}
-	if got := age(podsNow.Add(-45*time.Second), podsNow); got != "45s" {
-		t.Errorf("age = %q, want 45s", got)
-	}
-}
 
 // podsClient is a fake cluster with one node and one pod.
 func podsClient() *fake.Clientset {
@@ -56,8 +26,8 @@ func podsClient() *fake.Clientset {
 }
 
 func TestLoadPods(t *testing.T) {
-	msg := loadPods(k8s.NewClientFromClientset(podsClient()), false, "")().(itemsLoadedMsg)
-	if msg.err != nil || msg.tab != tabPods || len(msg.rows) != 1 || !strings.HasPrefix(msg.rows[0], "default   web   0/1   Running") {
+	msg := commands.LoadPods(k8s.NewClientFromClientset(podsClient()), false, "")().(commands.ItemsLoadedMsg)
+	if msg.Err != nil || msg.Tab != tabPods || len(msg.Rows) != 1 || !strings.HasPrefix(msg.Rows[0], "default   web   0/1   Running") {
 		t.Errorf("loadPods = %+v", msg)
 	}
 }
@@ -103,10 +73,10 @@ func TestPodsOnlyLoadedOnPodsTab(t *testing.T) {
 // ---------- actions on a pod ----------
 
 func TestPodTarget(t *testing.T) {
-	if got := podTarget("kube-system   coredns-abc   1/1   Running", ""); got != "kube-system/coredns-abc" {
+	if got := commands.PodTarget("kube-system   coredns-abc   1/1   Running", ""); got != "kube-system/coredns-abc" {
 		t.Errorf("podTarget = %q", got)
 	}
-	if got := podArgs("kube-system/coredns-abc"); got != "coredns-abc -n kube-system" {
+	if got := commands.PodArgs("kube-system/coredns-abc"); got != "coredns-abc -n kube-system" {
 		t.Errorf("podArgs = %q", got)
 	}
 }
@@ -199,7 +169,7 @@ func TestPodLogsOpenAtEnd(t *testing.T) {
 	for i := range 100 {
 		lines = append(lines, fmt.Sprint("line ", i))
 	}
-	m = press(t, m, actionDoneMsg{action: "Logs", target: "default/web", text: strings.Join(lines, "\n"), atEnd: true})
+	m = press(t, m, commands.ActionDoneMsg{Action: "Logs", Target: "default/web", Text: strings.Join(lines, "\n"), AtEnd: true})
 	if m.overlay != overlayText || m.textOffset != 100-m.listHeight() {
 		t.Errorf("overlay = %d, offset = %d, want the end", m.overlay, m.textOffset)
 	}
@@ -279,10 +249,10 @@ func TestPodDeleteNow(t *testing.T) {
 // Every pod action has its own key, a kubectl command and a run.
 func TestPodActionsComplete(t *testing.T) {
 	seen := map[string]bool{}
-	for _, a := range podActions() {
-		if a.key == "" || seen[a.key] || a.key == KeyJ || a.key == KeyK || !strings.HasPrefix(a.command, "kubectl ") || a.run == nil {
-			t.Errorf("action %q: key %q used twice, moves the list, or is incomplete", a.name, a.key)
+	for _, a := range commands.PodActions() {
+		if a.Key == "" || seen[a.Key] || a.Key == KeyJ || a.Key == KeyK || !strings.HasPrefix(a.Command, "kubectl ") || a.Run == nil {
+			t.Errorf("action %q: key %q used twice, moves the list, or is incomplete", a.Name, a.Key)
 		}
-		seen[a.key] = true
+		seen[a.Key] = true
 	}
 }

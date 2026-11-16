@@ -7,6 +7,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,69 +51,21 @@ func resourcesClient() *k8s.Client {
 	return k8s.NewClientFromClientset(cs)
 }
 
-var someResources = []k8s.Resource{
-	{Name: "deployments", ShortNames: []string{"deploy"}, APIVersion: "apps/v1", Namespaced: true,
-		Kind: "Deployment", Verbs: []string{"get", "list", "watch"}, Categories: []string{"all"}},
-	{Name: "nodes", ShortNames: []string{"no"}, APIVersion: "v1", Kind: "Node", Verbs: []string{"get", "list"}},
-	{Name: "customthings", APIVersion: "example.com/v1", Namespaced: true, Kind: "CustomThing"},
-}
-
-// ---------- rows ----------
-
-func TestResourceRows(t *testing.T) {
-	rows := resourceRows(someResources, false)
-	for i, want := range [][]string{
-		{"deployments", "deploy", "apps/v1", "true", "Deployment"},
-		{"nodes", "no", "v1", "false", "Node"},
-		{"customthings", "example.com/v1", "true", "CustomThing"},
-	} {
-		for _, cell := range want {
-			if !strings.Contains(rows[i], cell) {
-				t.Errorf("row %d %q is missing %q", i, rows[i], cell)
-			}
-		}
-	}
-	if strings.Contains(rows[0], "watch") {
-		t.Errorf("narrow row %q has the verbs, want them only with wide", rows[0])
-	}
-}
-
-func TestResourceRowsWide(t *testing.T) {
-	rows := resourceRows(someResources, true)
-	if !strings.Contains(rows[0], "get,list,watch") || !strings.Contains(rows[0], "all") {
-		t.Errorf("wide row %q, want verbs get,list,watch and category all", rows[0])
-	}
-}
-
-// Columns line up, even when a resource has no short names.
-func TestResourceRowsAligned(t *testing.T) {
-	rows := resourceRows(someResources, false)
-	for _, kind := range []string{"Deployment", "Node", "CustomThing"} {
-		if !strings.Contains(strings.Join(rows, "\n"), kind) {
-			t.Fatalf("rows are missing %s", kind)
-		}
-	}
-	col := strings.Index(rows[0], "Deployment")
-	if strings.Index(rows[1], "Node") != col || strings.Index(rows[2], "CustomThing") != col {
-		t.Errorf("KIND column not aligned:\n%s", strings.Join(rows, "\n"))
-	}
-}
-
 // ---------- loading ----------
 
 func TestLoadResources(t *testing.T) {
-	msg := loadResources(resourcesClient(), false, "")().(itemsLoadedMsg)
-	if msg.err != nil || msg.tab != tabMore || msg.wide {
+	msg := commands.LoadResources(resourcesClient(), false, "")().(commands.ItemsLoadedMsg)
+	if msg.Err != nil || msg.Tab != tabMore || msg.Wide {
 		t.Fatalf("msg = %#v", msg)
 	}
-	if len(msg.rows) != 2 || !strings.HasPrefix(msg.rows[0], "deployments") || !strings.HasPrefix(msg.rows[1], "pods") {
-		t.Errorf("rows = %q, want deployments then pods", msg.rows)
+	if len(msg.Rows) != 2 || !strings.HasPrefix(msg.Rows[0], "deployments") || !strings.HasPrefix(msg.Rows[1], "pods") {
+		t.Errorf("rows = %q, want deployments then pods", msg.Rows)
 	}
 }
 
 func TestLoadResourcesWide(t *testing.T) {
-	msg := loadResources(resourcesClient(), true, "")().(itemsLoadedMsg)
-	if !msg.wide || !strings.Contains(msg.rows[0], "get,list,watch") {
+	msg := commands.LoadResources(resourcesClient(), true, "")().(commands.ItemsLoadedMsg)
+	if !msg.Wide || !strings.Contains(msg.Rows[0], "get,list,watch") {
 		t.Errorf("msg = %#v, want wide rows with verbs", msg)
 	}
 }
@@ -122,8 +75,8 @@ func TestLoadResourcesError(t *testing.T) {
 	cs.PrependReactor("get", "group", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, errors.New("forbidden")
 	})
-	msg := loadResources(k8s.NewClientFromClientset(cs), false, "")().(itemsLoadedMsg)
-	if msg.err == nil || msg.tab != tabMore {
+	msg := commands.LoadResources(k8s.NewClientFromClientset(cs), false, "")().(commands.ItemsLoadedMsg)
+	if msg.Err == nil || msg.Tab != tabMore {
 		t.Errorf("msg = %#v, want an error for More", msg)
 	}
 }
@@ -155,7 +108,7 @@ func TestOpeningMoreLoadsIt(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("opening More returned no command, want a load")
 	}
-	if msg, ok := cmd().(itemsLoadedMsg); !ok || msg.tab != tabMore {
+	if msg, ok := cmd().(commands.ItemsLoadedMsg); !ok || msg.Tab != tabMore {
 		t.Errorf("opening More sent %#v, want a load of More", msg)
 	}
 }
@@ -163,7 +116,7 @@ func TestOpeningMoreLoadsIt(t *testing.T) {
 // Opening More again doesn't reload it: it is loaded once.
 func TestOpeningMoreAgainDoesNotReload(t *testing.T) {
 	m := New(resourcesClient())
-	m = press(t, m, itemsLoadedMsg{tab: tabMore, rows: []string{"pods"}, at: time.Now()})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabMore, Rows: []string{"pods"}, At: time.Now()})
 	m.active = moreIndex(t, m) - 1
 	if _, cmd := m.Update(right); cmd != nil {
 		t.Errorf("opening More again returned %#v, want no reload", cmd())
@@ -187,7 +140,7 @@ func TestTickDoesNotReloadMore(t *testing.T) {
 func TestWideOnMoreReloads(t *testing.T) {
 	m := onMore(t, New(resourcesClient()))
 	_, cmd := m.Update(wideKey)
-	if msg, ok := cmd().(itemsLoadedMsg); !ok || msg.tab != tabMore || !msg.wide {
+	if msg, ok := cmd().(commands.ItemsLoadedMsg); !ok || msg.Tab != tabMore || !msg.Wide {
 		t.Errorf("w on More sent %#v, want a wide load of More", msg)
 	}
 }
@@ -216,7 +169,7 @@ func TestButtonCursorKeptOnSwitchToMore(t *testing.T) {
 func TestMoreShowsLoadedTime(t *testing.T) {
 	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
 	m := onMore(t, New(nil))
-	m = press(t, m, itemsLoadedMsg{tab: tabMore, rows: []string{"pods"}, at: at})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabMore, Rows: []string{"pods"}, At: at})
 	if got := m.lastUpdated(); got != "loaded 14:30:05" {
 		t.Errorf("lastUpdated = %q, want loaded 14:30:05", got)
 	}
@@ -230,7 +183,7 @@ func TestMoreShowsLoadedTime(t *testing.T) {
 func TestViewMore(t *testing.T) {
 	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
 	m := sized(t, onMore(t, New(nil)), 100, 20)
-	m = press(t, m, itemsLoadedMsg{tab: tabMore, rows: resourceRows(someResources, false), at: at})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabMore, Rows: []string{"deployments   deploy   apps/v1   true   Deployment", "nodes   no   v1   false   Node", "customthings      example.com/v1   true   CustomThing"}, At: at})
 	lines := strings.Split(m.View(), "\n")
 	top := lines[1+panelMarginY]
 	if !strings.Contains(top, "wide: off") || strings.Contains(top, "refresh") || !strings.Contains(top, "loaded 14:30:05") {

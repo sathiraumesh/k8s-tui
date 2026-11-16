@@ -1,6 +1,7 @@
 package mvc
 
 import (
+	"k8s-tui/internal/mvc/commands"
 	"strings"
 	"testing"
 
@@ -23,7 +24,7 @@ func TestSearchFilters(t *testing.T) {
 	if !m.searching || m.searchText() != "KER2" {
 		t.Fatalf("searching = %v, search = %q", m.searching, m.searchText())
 	}
-	if got := m.rows(); len(got) != 1 || rowName(got[0]) != "worker2" {
+	if got := m.rows(); len(got) != 1 || commands.RowName(got[0]) != "worker2" {
 		t.Errorf("rows = %q, want only worker2", got)
 	}
 	if m.cursor != 0 {
@@ -142,10 +143,10 @@ func TestSearchCommand(t *testing.T) {
 // A refresh with fewer matching rows keeps the cursor on one of them.
 func TestSearchRefreshKeepsCursor(t *testing.T) {
 	m, _ := nodesOnScreen(t)
-	m = press(t, m, itemsLoadedMsg{tab: tabNodes, rows: []string{"a1", "a2", "a3", "b1"}, at: m.updated[tabNodes]})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabNodes, Rows: []string{"a1", "a2", "a3", "b1"}, At: m.updated[tabNodes]})
 	m = press(t, typeSearch(t, m, "a"), enterKey, down, down) // on a3
-	m = press(t, m, itemsLoadedMsg{tab: tabNodes, rows: []string{"a1", "b1"}, at: m.updated[tabNodes]})
-	if m.cursor != 0 || rowName(m.rows()[m.cursor]) != "a1" {
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabNodes, Rows: []string{"a1", "b1"}, At: m.updated[tabNodes]})
+	if m.cursor != 0 || commands.RowName(m.rows()[m.cursor]) != "a1" {
 		t.Errorf("cursor = %d on %q", m.cursor, m.rows())
 	}
 }

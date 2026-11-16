@@ -6,6 +6,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,7 @@ func onPodsWith(t *testing.T, cs *fake.Clientset) Model {
 	t.Helper()
 	m := sized(t, New(k8s.NewClientFromClientset(cs)), 120, 30)
 	m.active = 1
-	return press(t, m, loadPods(m.client, false, allNamespaces)())
+	return press(t, m, commands.LoadPods(m.client, false, allNamespaces)())
 }
 
 // pickNs opens the picker, loads it, and picks the choice called name.
@@ -126,7 +127,7 @@ func TestPickAllNamespaces(t *testing.T) {
 // Rows on their way from the namespace picked before are dropped.
 func TestStaleNamespaceRowsDropped(t *testing.T) {
 	m := pickNs(t, onPodsWith(t, nsCluster()), "apps")
-	m = press(t, m, itemsLoadedMsg{tab: tabPods, rows: []string{"old   row"}, at: time.Now(), namespace: allNamespaces})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabPods, Rows: []string{"old   row"}, At: time.Now(), Namespace: allNamespaces})
 	if got := m.rows(); len(got) != 1 || !strings.HasPrefix(got[0], "shop") {
 		t.Errorf("rows = %q, want the apps rows kept", got)
 	}
@@ -165,7 +166,7 @@ func TestRunInPickedNamespace(t *testing.T) {
 }
 
 func TestPodTargetInNamespace(t *testing.T) {
-	if got := podTarget("shop   1/1   Running", "apps"); got != "apps/shop" {
+	if got := commands.PodTarget("shop   1/1   Running", "apps"); got != "apps/shop" {
 		t.Errorf("podTarget = %q", got)
 	}
 }

@@ -1,4 +1,4 @@
-package mvc
+package commands
 
 import (
 	"context"
@@ -13,15 +13,15 @@ import (
 
 // Commands for the More tab: every kind of thing the cluster serves.
 
-// loadResources asks the cluster which resource types it serves (like
+// LoadResources asks the cluster which resource types it serves (like
 // `kubectl api-resources`, or with wide, `kubectl api-resources -o wide`).
-func loadResources(c *k8s.Client, wide bool, _ string) tea.Cmd {
+func LoadResources(c *k8s.Client, wide bool, _ string) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), APITimeout)
 		defer cancel()
 
 		resources, err := c.ListResources(ctx)
-		return itemsLoadedMsg{tab: tabMore, rows: resourceRows(resources, wide), err: err, at: time.Now(), wide: wide}
+		return ItemsLoadedMsg{Tab: TabMore, Rows: resourceRows(resources, wide), Err: err, At: time.Now(), Wide: wide}
 	}
 }
 
@@ -50,5 +50,5 @@ func resourceRows(resources []k8s.Resource, wide bool) []string {
 		}
 		cells = append(cells, row)
 	}
-	return alignColumns(cells)
+	return AlignColumns(cells)
 }

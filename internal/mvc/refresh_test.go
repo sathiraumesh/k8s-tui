@@ -7,6 +7,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -35,7 +36,7 @@ func runBatch(t *testing.T, cmd tea.Cmd) []tea.Msg {
 
 func hasLoaded(msgs []tea.Msg, tab string) bool {
 	for _, msg := range msgs {
-		if l, ok := msg.(itemsLoadedMsg); ok && l.tab == tab {
+		if l, ok := msg.(commands.ItemsLoadedMsg); ok && l.Tab == tab {
 			return true
 		}
 	}
@@ -112,7 +113,7 @@ func TestNoClientNoLoad(t *testing.T) {
 
 func TestLoadRecordsUpdateTime(t *testing.T) {
 	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
-	m := press(t, New(nil), itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at})
+	m := press(t, New(nil), commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"n1"}, At: at})
 	if got := m.updated["Nodes"]; !got.Equal(at) {
 		t.Errorf("updated[Nodes] = %v, want %v", got, at)
 	}
@@ -121,8 +122,8 @@ func TestLoadRecordsUpdateTime(t *testing.T) {
 func TestFailedLoadKeepsOldUpdateTime(t *testing.T) {
 	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
 	m := press(t, New(nil),
-		itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at},
-		itemsLoadedMsg{tab: "Nodes", err: errTest, at: at.Add(time.Minute)},
+		commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"n1"}, At: at},
+		commands.ItemsLoadedMsg{Tab: "Nodes", Err: errTest, At: at.Add(time.Minute)},
 	)
 	if got := m.updated["Nodes"]; !got.Equal(at) {
 		t.Errorf("updated[Nodes] = %v, want the last successful time %v", got, at)
@@ -174,7 +175,7 @@ func TestTurningOnLoadsAndStartsTimer(t *testing.T) {
 	if !ok || len(batch) != 2 {
 		t.Fatalf("turning on sent %#v, want a batch of load + timer", cmd())
 	}
-	if msg, ok := batch[0]().(itemsLoadedMsg); !ok || msg.tab != "Nodes" {
+	if msg, ok := batch[0]().(commands.ItemsLoadedMsg); !ok || msg.Tab != "Nodes" {
 		t.Errorf("first command sent %#v, want a reload of Nodes", msg)
 	}
 }
@@ -386,7 +387,7 @@ func TestViewFitsWidthWhenNarrow(t *testing.T) {
 // When a refresh returns fewer rows, the cursor moves onto the last one left.
 func TestCursorClampedWhenRowsShrink(t *testing.T) {
 	m := press(t, testModel(), down, down, down) // cursor on row 2 of 3
-	m = press(t, m, itemsLoadedMsg{tab: "Nodes", rows: []string{"only-one"}})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"only-one"}})
 	if m.cursor != 0 {
 		t.Errorf("cursor = %d, want 0 after rows shrank to 1", m.cursor)
 	}
@@ -395,7 +396,7 @@ func TestCursorClampedWhenRowsShrink(t *testing.T) {
 // A refresh of another tab must not move the cursor on the active one.
 func TestCursorKeptWhenOtherTabLoads(t *testing.T) {
 	m := press(t, testModel(), down, down, down) // cursor on row 2 of Nodes
-	m = press(t, m, itemsLoadedMsg{tab: "Pods", rows: nil})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: "Pods", Rows: nil})
 	if m.cursor != 2 {
 		t.Errorf("cursor = %d, want 2 (unchanged)", m.cursor)
 	}
@@ -417,7 +418,7 @@ var (
 func loadedAt(t *testing.T) Model {
 	t.Helper()
 	at := time.Date(2026, 11, 12, 14, 30, 5, 0, time.Local)
-	return press(t, onScreen(t), itemsLoadedMsg{tab: "Nodes", rows: []string{"n1"}, at: at})
+	return press(t, onScreen(t), commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"n1"}, At: at})
 }
 
 // topBorder is the panel's top border line of the rendered screen.

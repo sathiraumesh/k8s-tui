@@ -5,6 +5,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -17,15 +18,15 @@ import (
 // Names of the tabs. Rows, update times and wide settings are kept per tab
 // under these names.
 const (
-	tabNodes       = "Nodes"
-	tabPods        = "Pods"
-	tabDeployments = "Deployments"
-	tabServices    = "Services"
-	tabMore        = "More" // every resource type the cluster serves, like `kubectl api-resources`
+	tabNodes       = commands.TabNodes
+	tabPods        = commands.TabPods
+	tabDeployments = commands.TabDeployments
+	tabServices    = commands.TabServices
+	tabMore        = commands.TabMore
 )
 
 // loader returns the command that loads a tab's rows. It sends an
-// itemsLoadedMsg for the tab, with the rows (with or without the wide
+// commands.ItemsLoadedMsg for the tab, with the rows (with or without the wide
 // columns) and when they were loaded. namespace is the one to load from,
 // "" for all of them; a tab that isn't namespaced always gets "".
 type loader func(c *k8s.Client, wide bool, namespace string) tea.Cmd
@@ -41,8 +42,8 @@ type tab struct {
 	command string
 
 	// actions are what can be done to a row of the tab: enter on a row
-	// opens them (actions.go). nil if the tab has none.
-	actions []action
+	// opens them (commands.Action; the pages are in actions.go). nil if the tab has none.
+	actions []commands.Action
 
 	// rowTarget is what a row's actions are for, e.g. "worker1", or for a
 	// pod "default/web". nil means the row's first column.
@@ -56,7 +57,7 @@ type tab struct {
 	// pod: the tab's button (ownButton, e.g. "+ run") or KeyOwn opens them.
 	// ownTitle heads their list ("Run a pod"), and ownTarget is what they
 	// are for (the namespace, "default").
-	own       []action
+	own       []commands.Action
 	ownButton string
 	ownTitle  string
 	ownTarget string
@@ -78,23 +79,23 @@ func allTabs() []tab {
 	return []tab{
 		{
 			name:        tabNodes,
-			load:        loadNodes,
+			load:        commands.LoadNodes,
 			command:     "kubectl get nodes",
-			actions:     nodeActions(),
+			actions:     commands.NodeActions(),
 			autoRefresh: true,
 		},
 		{
 			name:          tabPods,
-			load:          loadPods,
+			load:          commands.LoadPods,
 			command:       "kubectl get pods",
 			namespaced:    true,
-			actions:       podActions(),
-			rowTarget:     podTarget,
-			commandTarget: podArgs,
-			own:           runPodActions(),
+			actions:       commands.PodActions(),
+			rowTarget:     commands.PodTarget,
+			commandTarget: commands.PodArgs,
+			own:           commands.RunPodActions(),
 			ownButton:     "+ run",
 			ownTitle:      "Run a pod",
-			ownTarget:     runNamespace,
+			ownTarget:     commands.RunNamespace,
 			autoRefresh:   true,
 		},
 		{
@@ -113,7 +114,7 @@ func allTabs() []tab {
 		},
 		{
 			name:        tabMore,
-			load:        loadResources,
+			load:        commands.LoadResources,
 			command:     "kubectl api-resources",
 			autoRefresh: false,
 		},
@@ -129,9 +130,9 @@ func (m Model) kubectlCommand() string {
 	switch m.overlay {
 	case overlayActions:
 		a := m.actions()[m.overlayCursor]
-		return a.commandFor(m.commandTarget(), a.inputDefault, a.flags)
+		return a.CommandFor(m.commandTarget(), a.InputDefault, a.Flags)
 	case overlayConfirm, overlayText:
-		return m.chosen().commandFor(m.commandTarget(), m.input, m.flags)
+		return m.chosen().CommandFor(m.commandTarget(), m.input, m.flags)
 	case overlayNamespaces:
 		return "kubectl get namespaces"
 	}
@@ -169,7 +170,7 @@ func shellQuote(s string) string {
 func placeholder(name string, rows ...string) loader {
 	return func(_ *k8s.Client, wide bool, namespace string) tea.Cmd {
 		return func() tea.Msg {
-			return itemsLoadedMsg{tab: name, rows: rows, at: time.Now(), wide: wide, namespace: namespace}
+			return commands.ItemsLoadedMsg{Tab: name, Rows: rows, At: time.Now(), Wide: wide, Namespace: namespace}
 		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -68,18 +69,18 @@ func TestActiveTab(t *testing.T) {
 // ---------- placeholder tabs ----------
 
 func TestPlaceholderSendsItsRows(t *testing.T) {
-	msg := placeholder("Things", "a", "b")(nil, false, "")().(itemsLoadedMsg)
-	if msg.tab != "Things" || !slices.Equal(msg.rows, []string{"a", "b"}) || msg.err != nil {
+	msg := placeholder("Things", "a", "b")(nil, false, "")().(commands.ItemsLoadedMsg)
+	if msg.Tab != "Things" || !slices.Equal(msg.Rows, []string{"a", "b"}) || msg.Err != nil {
 		t.Errorf("msg = %#v, want rows a, b for Things", msg)
 	}
-	if time.Since(msg.at) > time.Minute {
-		t.Errorf("at = %v, want the time it was sent", msg.at)
+	if time.Since(msg.At) > time.Minute {
+		t.Errorf("at = %v, want the time it was sent", msg.At)
 	}
 }
 
 // The placeholder keeps the wide setting, so Update doesn't drop its rows.
 func TestPlaceholderKeepsWide(t *testing.T) {
-	if msg := placeholder("Things", "a")(nil, true, "")().(itemsLoadedMsg); !msg.wide {
+	if msg := placeholder("Things", "a")(nil, true, "")().(commands.ItemsLoadedMsg); !msg.Wide {
 		t.Error("wide = false, want the wide setting it was given")
 	}
 }
@@ -95,7 +96,7 @@ func TestEveryTabLoads(t *testing.T) {
 			t.Errorf("%s: loadActive = nil, want a loader", tb.name)
 			continue
 		}
-		if msg, ok := cmd().(itemsLoadedMsg); !ok || msg.tab != tb.name {
+		if msg, ok := cmd().(commands.ItemsLoadedMsg); !ok || msg.Tab != tb.name {
 			t.Errorf("%s: loader sent %#v, want rows for %s", tb.name, msg, tb.name)
 		}
 	}
@@ -111,7 +112,7 @@ func TestEveryTabShowsLastUpdate(t *testing.T) {
 		t.Run(tb.name, func(t *testing.T) {
 			m := New(nil)
 			m.active = i
-			m = press(t, m, itemsLoadedMsg{tab: tb.name, rows: []string{"x"}, at: at})
+			m = press(t, m, commands.ItemsLoadedMsg{Tab: tb.name, Rows: []string{"x"}, At: at})
 
 			want := "updated 14:30:05"
 			if !tb.autoRefresh {

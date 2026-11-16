@@ -19,9 +19,13 @@ internal/
     controller.go           Update: what each message and key does
     view.go                 View: draws the screen; styles of tabs, panel, rows
     keys.go                 every key binding, as constants
-    messages.go             every message type, and the refresh rates
-    nodes_commands.go       loadNodes: the background call for the Nodes tab
-    resources_commands.go   loadResources: the background call for the More tab
+    messages.go             the refresh rates and the refresh tick message
+    commands/               what each tab loads and does (its own package)
+      actions.go            Action, Flag, Read / Change / InTerminal, and the
+                            messages commands send: ItemsLoadedMsg, ActionDoneMsg
+      nodes.go              LoadNodes, NodeActions
+      pods.go               LoadPods, PodActions, RunPodActions
+      resources.go          LoadResources (More tab)
     refresh.go              the auto refresh timer and rates (logic only)
     secondary_bar_view.go   the buttons on the panel's top border: wide,
                             refresh (drawing only)
@@ -35,7 +39,8 @@ examples/                   small stand-alone programs for learning Bubble Tea
 docs/                       this documentation
 ```
 
-Dependencies go one way: `main → app → mvc → kubernetes, styles`.
+Dependencies go one way: `main → app → mvc → commands → kubernetes`
+(and `mvc → styles`).
 `kubernetes` knows nothing about the UI, and `mvc` never touches client-go
 types: it only sees the app's own types, such as `kubernetes.Node`.
 
@@ -75,16 +80,16 @@ Bubble Tea runs in the background. When it finishes, it returns a
 **message**, which Bubble Tea passes to `Update`.
 
 ```
-Init / Update ──returns──▶ loadNodes(client)        (nodes_commands.go)
+Init / Update ──returns──▶ commands.LoadNodes(client)   (commands/nodes.go)
                                 │ runs in the background: client.ListNodes
                                 ▼
-                    itemsLoadedMsg{tab, rows, err, at, wide}   (messages.go)
+                    ItemsLoadedMsg{Tab, Rows, Err, At, Wide}   (commands/actions.go)
                                 │
                                 ▼
                    Update stores rows in m.items[tab] ──▶ View draws them
 ```
 
-Every tab sends the same `itemsLoadedMsg`, so `Update` has one case for
+Every tab sends the same `ItemsLoadedMsg`, so `Update` has one case for
 all of them. If the call failed, `m.err` is set and `View` shows it in the
 panel; the old rows and update time are kept.
 
@@ -122,7 +127,7 @@ and the refresh timer all read this table.
 
 A tab that isn't loaded from the cluster yet (Pods, Deployments, Services)
 uses `placeholder(name, rows...)`: a loader that sends the same fixed rows
-through the same `itemsLoadedMsg` as a real loader. So it gets an update
+through the same `ItemsLoadedMsg` as a real loader. So it gets an update
 time, auto refresh and the wide setting like every other tab, and giving
 it real data later is a one-line change in `allTabs`.
 
@@ -130,13 +135,13 @@ it real data later is a one-line change in `allTabs`.
 
 `m.wide` holds each tab's wide setting, keyed by tab name. `toggleWide`
 (the `w` key, or the wide button) flips it for the active tab and reloads
-the tab. The loader gets the setting (`loadNodes(client, wide)`) and builds
-rows with or without the wide columns; `alignColumns` in
-[nodes_commands.go](../internal/mvc/nodes_commands.go) pads every column
+the tab. The loader gets the setting (`commands.LoadNodes(client, wide)`) and builds
+rows with or without the wide columns; `AlignColumns` in
+[commands/nodes.go](../internal/mvc/commands/nodes.go) pads every column
 to its widest cell so they line up.
 
 A load already on its way when wide is switched would arrive with the old
-columns. So `itemsLoadedMsg` carries the `wide` it was loaded with, and
+columns. So `ItemsLoadedMsg` carries the `wide` it was loaded with, and
 `Update` drops rows whose `wide` no longer matches the tab's setting; the
 load the switch started brings the right ones.
 
@@ -220,13 +225,13 @@ Using Pods as the example:
 1. In `internal/kubernetes`, add a `Pod` type and
    `func (c *Client) ListPods(ctx context.Context) ([]Pod, error)`,
    following [nodes.go](../internal/kubernetes/nodes.go).
-2. In `internal/mvc`, add `pods_commands.go` with `loadPods` and `podRows`,
-   following [nodes_commands.go](../internal/mvc/nodes_commands.go). It
-   returns `itemsLoadedMsg{tab: tabPods, …}`.
+2. In `internal/mvc/commands`, add `pods.go` with `LoadPods` and `podRows`,
+   following [nodes.go](../internal/mvc/commands/nodes.go). It
+   returns `ItemsLoadedMsg{Tab: TabPods, …}`.
 3. In `allTabs` ([tabs.go](../internal/mvc/tabs.go)), replace
-   `placeholder(tabPods, …)` with `loadPods`.
+   `placeholder(tabPods, …)` with `commands.LoadPods`.
 
-`Update` needs no change: it already handles `itemsLoadedMsg` for any
+`Update` needs no change: it already handles `commands.ItemsLoadedMsg` for any
 tab, and auto refresh, wide and the update time work through `allTabs`.
 
 ### Add a tab
@@ -246,7 +251,8 @@ start with) and `autoRefresh`. The tab bar, buttons and timer pick it up.
 
 ### Add a message
 
-1. Define it in [messages.go](../internal/mvc/messages.go).
+1. Define it in [messages.go](../internal/mvc/messages.go), or, if a
+   command in `commands` sends it, in that package.
 2. Return it from a command.
 3. Add a `case` for it to `Update`.
 

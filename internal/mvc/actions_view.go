@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"fmt"
+	"k8s-tui/internal/mvc/commands"
 )
 
 // Drawing the pages that open on top of the list (actions.go): the action
@@ -69,9 +70,9 @@ func (m Model) cursorShown() bool {
 func (m Model) actionRows() []string {
 	cells := make([][]string, len(m.actions()))
 	for i, a := range m.actions() {
-		cells[i] = []string{a.key, a.name, a.about}
+		cells[i] = []string{a.Key, a.Name, a.About}
 	}
-	return alignColumns(cells)
+	return commands.AlignColumns(cells)
 }
 
 // confirmRows is the confirm page: what the action does, its text field,
@@ -79,16 +80,16 @@ func (m Model) actionRows() []string {
 // field or flag the cursor is on, or -1 if the action has neither.
 func (m Model) confirmRows() (rows []string, cursor int) {
 	a := m.chosen()
-	rows = []string{a.about, ""}
+	rows = []string{a.About, ""}
 
 	cursor = -1
-	if a.input != "" {
+	if a.Input != "" {
 		caret := ""
 		if m.typing() {
 			caret = "█" // where the next letter goes
 		}
 		cursor = len(rows)
-		rows = append(rows, a.input+": "+m.input+caret, "")
+		rows = append(rows, a.Input+": "+m.input+caret, "")
 	}
 
 	if len(m.flags) > 0 {
@@ -97,19 +98,19 @@ func (m Model) confirmRows() (rows []string, cursor int) {
 		}
 		for _, f := range m.flags {
 			box := "[ ]"
-			if f.on {
+			if f.On {
 				box = "[x]"
 			}
-			row := box + " " + f.name
-			if f.off != "" {
-				row += "   (else " + f.off + ")"
+			row := box + " " + f.Name
+			if f.Off != "" {
+				row += "   (else " + f.Off + ")"
 			}
 			rows = append(rows, row)
 		}
 		rows = append(rows, "")
 	}
 
-	if a.changes {
+	if a.Changes {
 		rows = append(rows, "This changes the cluster. y run • n back")
 	} else {
 		rows = append(rows, "enter run • esc back")
@@ -129,12 +130,12 @@ func (m Model) overlayTitle() string {
 	case overlayNamespaces:
 		return "Namespace"
 	case overlayContainers:
-		return m.chosen().name + " " + m.target + ": container"
+		return m.chosen().Name + " " + m.target + ": container"
 	case overlayConfirm, overlayText:
 		if m.tabActions {
-			return m.chosen().name + " in " + m.target
+			return m.chosen().Name + " in " + m.target
 		}
-		return m.chosen().name + " " + m.target
+		return m.chosen().Name + " " + m.target
 	}
 	return ""
 }
@@ -152,14 +153,14 @@ func (m Model) helpText() string {
 	case overlayActions:
 		keys := ""
 		for _, a := range m.actions() {
-			keys += fmt.Sprintf(" • %s %s", a.key, a.name)
+			keys += fmt.Sprintf(" • %s %s", a.Key, a.Name)
 		}
 		return "↑↓ move • enter pick" + keys + " • esc back"
 	case overlayConfirm:
 		if m.typing() {
-			return "type the " + m.chosen().input + " • backspace delete • enter/↓ flags • esc back"
+			return "type the " + m.chosen().Input + " • backspace delete • enter/↓ flags • esc back"
 		}
-		if m.chosen().changes {
+		if m.chosen().Changes {
 			return "↑↓ move • space tick • y run • n back"
 		}
 		return "↑↓ move • space tick • enter run • esc back"

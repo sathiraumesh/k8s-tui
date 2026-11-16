@@ -1,14 +1,8 @@
 package mvc
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"os/exec"
-	"slices"
+	"k8s-tui/internal/mvc/commands"
 	"strings"
-
-	k8s "k8s-tui/internal/kubernetes"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -41,244 +35,14 @@ const (
 	overlayContainers                // the containers of a pod to pick from (containers.go)
 )
 
-// flag is one kubectl option of an action, shown as a tick box. It is
-// written as kubectl takes it, e.g. "--dry-run=server", and added to the
-// command when ticked.
-type flag struct {
-	name string
-	on   bool // ticked; the action's list gives the default
-
-	// off is written in the command instead while the flag isn't ticked,
-	// for a choice of two, e.g. "--image=busybox" for "--image=ubuntu".
-	// "" for nothing.
-	off string
-}
-
-// String is how the flag is written in the command now: its name if it is
-// ticked, else its off form.
-func (f flag) String() string {
-	if f.on {
-		return f.name
-	}
-	return f.off
-}
-
-// action is something that can be done to one row.
-type action struct {
-	key   string // picks it in the action list, e.g. "c"
-	name  string // e.g. "Cordon"
-	about string // one line: what it does
-
-	// changes is whether it changes the cluster. Such an action always asks
-	// first, and only y runs it. One that only reads runs with enter.
-	changes bool
-
-	flags []flag
-
-	// input names the text field of an action that needs something typed,
-	// e.g. "labels" for Label, where "env=prod" is typed. "" for none.
-	// inputDefault is what is in the field to begin with, to be changed.
-	input        string
-	inputDefault string
-
-	// containers is whether the action is for one container of a pod. If the
-	// pod has more than one, a picker asks which first (containers.go); the
-	// choice reaches run as its input.
-	containers bool
-
-	// inputArgs is how what was typed is written in the command, e.g.
-	// "db postgres" as "db --image=postgres". nil writes it as typed.
-	inputArgs func(input string) string
-
-	// command is the kubectl command, with %s where the row's name goes,
-	// e.g. "kubectl cordon %s". What was typed goes where {input} is, or
-	// after the command if there is no {input}; the ticked flags go last.
-	command string
-
-	// run does the action to target with what was typed and the given
-	// flags. It sends an actionDoneMsg when it is done.
-	run func(c *k8s.Client, target, input string, flags []flag) tea.Cmd
-}
-
-// commandFor is the kubectl command for running a on target with input
-// and flags, e.g. "kubectl label node worker1 env=prod --overwrite".
-func (a action) commandFor(target, input string, flags []flag) string {
-	if input = strings.TrimSpace(input); input != "" && a.inputArgs != nil {
-		input = a.inputArgs(input)
-	}
-	cmd := fmt.Sprintf(a.command, target)
-	if strings.Contains(cmd, inputHere) {
-		cmd, input = strings.ReplaceAll(cmd, inputHere, input), ""
-	}
-	parts := strings.Fields(cmd) // no double space where {input} was empty
-	if input != "" {
-		parts = append(parts, input)
-	}
-	for _, f := range flags {
-		if s := f.String(); s != "" {
-			parts = append(parts, s)
-		}
-	}
-	return strings.Join(parts, " ")
-}
-
-// inputHere marks where in an action's command what was typed goes.
-const inputHere = "{input}"
-
-// ticked reports whether the flag called name is ticked.
-func ticked(flags []flag, name string) bool {
-	for _, f := range flags {
-		if f.name == name && f.on {
-			return true
-		}
-	}
-	return false
-}
-
-// flagDryRun is the flag of a change that lets the cluster check it without
-// saving it. change reports a run with it ticked as a dry run.
-const flagDryRun = "--dry-run=server"
-
-// read returns the command for an action that only reads: it runs get and
-// sends its text, to be shown on a page.
-func read(name, target string, get func(context.Context) (string, error)) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
-		defer cancel()
-		text, err := get(ctx)
-		return actionDoneMsg{action: name, target: target, text: text, err: err}
-	}
-}
-
-// readToEnd is read for a text whose end matters most, such as logs: the
-// page opens scrolled to its last line.
-func readToEnd(name, target string, get func(context.Context) (string, error)) tea.Cmd {
-	cmd := read(name, target, get)
-	return func() tea.Msg {
-		msg := cmd().(actionDoneMsg)
-		msg.atEnd = true
-		return msg
-	}
-}
-
-// change returns the command for an action that changes the cluster: it
-// runs do and reports whether it worked. do may also return a text of what
-// changed (see changeText); after a dry run it is shown on a page.
-func change(name, target string, flags []flag, do func(context.Context) (string, error)) tea.Cmd {
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
-		defer cancel()
-		text, err := do(ctx)
-		return actionDoneMsg{action: name, target: target, changed: true, dryRun: ticked(flags, flagDryRun), text: text, err: err}
-	}
-}
-
-// inTerminal returns the command for an action that needs the terminal to
-// itself, such as a shell or an editor: the app steps aside while cmd runs
-// and comes back when it ends. err is from making cmd, e.g. kubectl isn't
-// installed. closed is what the line under the panel says afterwards.
-//
-// shell says cmd is a shell: it ends with the code of the last thing typed
-// in it, which isn't a failure of the shell, so only failing to start is.
-// Anything else that ends with an error code has failed.
-func inTerminal(name, target, closed string, shell bool, cmd *exec.Cmd, err error) tea.Cmd {
-	done := func(err error) tea.Msg {
-		return actionDoneMsg{action: name, target: target, terminal: true, closed: closed, err: err}
-	}
-	if err != nil {
-		return func() tea.Msg { return done(err) }
-	}
-	return tea.ExecProcess(cmd, func(err error) tea.Msg { return done(terminalError(shell, err)) })
-}
-
-// terminalError is how a command run in the terminal ended, as inTerminal
-// reports it: nil for a shell's exit code, an error for anything else's.
-func terminalError(shell bool, err error) error {
-	var exit *exec.ExitError
-	switch {
-	case !errors.As(err, &exit):
-		return err // nil, or it couldn't start
-	case shell:
-		return nil
-	}
-	return fmt.Errorf("kubectl ended with an error (%w)", err)
-}
-
-// section is one titled list of a page of text, e.g. a node's labels.
-type section struct {
-	title string
-	items []string
-}
-
-// sectionsText is a page of titled lists, e.g. the Show page of a node:
-//
-//	Labels:
-//
-//	  env=prod
-//	  kubernetes.io/os=linux
-//
-//	Taints:
-//
-//	  (none)
-func sectionsText(sections ...section) string {
-	var lines []string
-	for _, s := range sections {
-		lines = append(lines, s.title+":", "")
-		if len(s.items) == 0 {
-			lines = append(lines, "  (none)")
-		}
-		for _, item := range s.items {
-			lines = append(lines, "  "+item)
-		}
-		lines = append(lines, "")
-	}
-	return strings.Join(lines, "\n")
-}
-
-// changeText shows what a change does to a list, e.g. a node's labels:
-// every item after it, "+" for the new ones, then "-" for the removed ones.
-//
-//	Labels after the change:
-//
-//	+ env=prod
-//	  kubernetes.io/os=linux
-//	- old=x
-func changeText(title string, before, after []string) string {
-	lines := []string{title + " after the change:", ""}
-	for _, s := range after {
-		mark := "  "
-		if !slices.Contains(before, s) {
-			mark = "+ "
-		}
-		lines = append(lines, mark+s)
-	}
-	for _, s := range before {
-		if !slices.Contains(after, s) {
-			lines = append(lines, "- "+s)
-		}
-	}
-	if len(before) == 0 && len(after) == 0 {
-		lines = append(lines, "(none)")
-	}
-	return strings.Join(lines, "\n")
-}
-
 // ---------- the model's side ----------
-
-// rowName is the name of the thing a row shows: its first column.
-func rowName(row string) string {
-	if fields := strings.Fields(row); len(fields) > 0 {
-		return fields[0]
-	}
-	return ""
-}
 
 // rowTarget is what the actions of row are for (see tab.rowTarget).
 func (m Model) rowTarget(row string) string {
 	if f := m.activeTab().rowTarget; f != nil {
 		return f(row, m.tabNamespace())
 	}
-	return rowName(row)
+	return commands.RowName(row)
 }
 
 // commandTarget is the target as the kubectl commands write it, e.g.
@@ -293,7 +57,7 @@ func (m Model) commandTarget() string {
 
 // actions are the active tab's actions for a row, or while its own action
 // list is open (tabActions), the tab's own actions, e.g. Run on Pods.
-func (m Model) actions() []action {
+func (m Model) actions() []commands.Action {
 	if m.tabActions {
 		return m.activeTab().own
 	}
@@ -301,7 +65,7 @@ func (m Model) actions() []action {
 }
 
 // chosen is the action picked in the action list.
-func (m Model) chosen() action {
+func (m Model) chosen() commands.Action {
 	return m.actions()[m.chosenAction]
 }
 
@@ -345,9 +109,9 @@ func (m Model) openOwnActions() Model {
 func (m Model) pick(i int) (Model, tea.Cmd) {
 	m.chosenAction = i
 	a := m.chosen()
-	m.flags = append([]flag(nil), a.flags...) // a copy: ticking must not change the table
-	m.input = a.inputDefault
-	if a.containers && m.client != nil {
+	m.flags = append([]commands.Flag(nil), a.Flags...) // a copy: ticking must not change the table
+	m.input = a.InputDefault
+	if a.Containers && m.client != nil {
 		return m, loadContainers(m.client, m.target)
 	}
 	return m.afterPick()
@@ -357,7 +121,7 @@ func (m Model) pick(i int) (Model, tea.Cmd) {
 // an action that only reads and has nothing to set, straight to running.
 func (m Model) afterPick() (Model, tea.Cmd) {
 	a := m.chosen()
-	if !a.changes && len(a.flags) == 0 && a.input == "" {
+	if !a.Changes && len(a.Flags) == 0 && a.Input == "" {
 		return m.runChosen()
 	}
 	m.overlay = overlayConfirm
@@ -369,20 +133,20 @@ func (m Model) afterPick() (Model, tea.Cmd) {
 // flags. An action with a text field doesn't run while it is empty.
 func (m Model) runChosen() (Model, tea.Cmd) {
 	a := m.chosen()
-	if a.input != "" && strings.TrimSpace(m.input) == "" {
-		m.notice = "type the " + a.input + " first"
+	if a.Input != "" && strings.TrimSpace(m.input) == "" {
+		m.notice = "type the " + a.Input + " first"
 		m.overlayCursor = 0 // on the text field
 		return m, nil
 	}
-	m.notice = "running: " + a.commandFor(m.commandTarget(), m.input, m.flags)
-	if a.changes {
+	m.notice = "running: " + a.CommandFor(m.commandTarget(), m.input, m.flags)
+	if a.Changes {
 		m.overlay = overlayNone // back to the list while it runs
 		m.tabActions = false
 	}
 	if m.client == nil {
 		return m, nil // tests without a cluster
 	}
-	return m, a.run(m.client, m.target, m.input, m.flags)
+	return m, a.Run(m.client, m.target, m.input, m.flags)
 }
 
 // closeOverlay goes back to the tab's list.
@@ -396,29 +160,29 @@ func (m Model) closeOverlay() Model {
 // onActionDone handles the end of an action: a read opens its text, a
 // change reloads the tab so the list shows it. Either way, the line under
 // the panel says how it went.
-func (m Model) onActionDone(msg actionDoneMsg) (Model, tea.Cmd) {
-	what := msg.action + " " + msg.target
+func (m Model) onActionDone(msg commands.ActionDoneMsg) (Model, tea.Cmd) {
+	what := msg.Action + " " + msg.Target
 	switch {
-	case msg.err != nil:
-		m.notice = what + " failed: " + msg.err.Error()
+	case msg.Err != nil:
+		m.notice = what + " failed: " + msg.Err.Error()
 		return m, nil
-	case msg.terminal:
+	case msg.Terminal:
 		m = m.closeOverlay() // an action that only reads, like Edit, ran from the action list
-		m.notice = msg.closed
+		m.notice = msg.Closed
 		return m, m.loadActive()
-	case msg.changed && msg.dryRun:
+	case msg.Changed && msg.DryRun:
 		m.notice = what + ": dry run passed, nothing changed"
-		if msg.text != "" {
-			m = m.showText(msg.text) // what it would change
+		if msg.Text != "" {
+			m = m.showText(msg.Text) // what it would change
 		}
 		return m, nil // nothing changed, so nothing to reload
-	case msg.changed:
+	case msg.Changed:
 		m.notice = what + ": done"
 		return m, m.loadActive()
 	}
 	m.notice = ""
-	m = m.showText(msg.text)
-	if msg.atEnd {
+	m = m.showText(msg.Text)
+	if msg.AtEnd {
 		m.textOffset = max(len(m.text)-m.listHeight(), 0) // the last lines on screen
 	}
 	return m, nil
@@ -435,7 +199,7 @@ func (m Model) showText(text string) Model {
 // fieldRows is the number of rows the chosen action's text field takes in
 // the confirm page's cursor: 1 if it has one, else 0. The flags come after.
 func (m Model) fieldRows() int {
-	if m.chosen().input != "" {
+	if m.chosen().Input != "" {
 		return 1
 	}
 	return 0
@@ -493,7 +257,7 @@ func (m Model) onOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.closeOverlay(), nil
 		default:
 			for i, a := range m.actions() {
-				if key == a.key {
+				if key == a.Key {
 					return m.pick(i)
 				}
 			}
@@ -508,14 +272,14 @@ func (m Model) onOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.overlayCursor = min(m.overlayCursor+1, max(m.fieldRows()+len(m.flags)-1, 0))
 		case KeySpace:
 			if i := m.overlayCursor - m.fieldRows(); i >= 0 && i < len(m.flags) {
-				m.flags[i].on = !m.flags[i].on
+				m.flags[i].On = !m.flags[i].On
 			}
 		case KeyYes:
-			if a.changes {
+			if a.Changes {
 				return m.runChosen()
 			}
 		case KeyEnter:
-			if !a.changes {
+			if !a.Changes {
 				return m.runChosen() // a change needs y: enter is too easy to press
 			}
 		case KeyNo, KeyEsc:

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -21,7 +22,7 @@ func ticks(t *testing.T, m Model, n int) Model {
 	return m
 }
 
-var nodesLoaded = itemsLoadedMsg{tab: tabNodes, rows: []string{"worker1   Ready   v1.37.2"}, at: time.Now()}
+var nodesLoaded = commands.ItemsLoadedMsg{Tab: tabNodes, Rows: []string{"worker1   Ready   v1.37.2"}, At: time.Now()}
 
 func TestNewHasNoSplash(t *testing.T) {
 	if New(nil).splash {
@@ -63,7 +64,7 @@ func TestSplashClosesAfterLoadAndMinFrames(t *testing.T) {
 
 // A cluster that fails to answer closes the splash too, to show the error.
 func TestSplashClosesOnError(t *testing.T) {
-	m := press(t, sized(t, New(nil).WithSplash(), 80, 24), itemsLoadedMsg{tab: tabNodes, err: errTest})
+	m := press(t, sized(t, New(nil).WithSplash(), 80, 24), commands.ItemsLoadedMsg{Tab: tabNodes, Err: errTest})
 	if m = ticks(t, m, minSplashFrames); m.splash {
 		t.Error("splash still showing after the load failed")
 	}

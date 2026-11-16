@@ -1,6 +1,10 @@
 package mvc
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"k8s-tui/internal/mvc/commands"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -18,29 +22,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// so refreshing starts again on the next tab that is.
 		return m, tea.Batch(m.refreshActive(), m.startTimer())
 
-	// A tab's data arrived from the cluster (see nodes_commands.go).
-	case itemsLoadedMsg:
+	// A tab's data arrived from the cluster (package commands).
+	case commands.ItemsLoadedMsg:
 		// Rows with the wrong columns: wide was switched while they were on
 		// their way. The load that switch started brings the right ones.
-		if msg.wide != m.wide[msg.tab] {
+		if msg.Wide != m.wide[msg.Tab] {
 			return m, nil
 		}
 		// Rows from the namespace picked before: the load the new pick
 		// started brings the right ones.
-		if t, ok := m.tabNamed(msg.tab); ok && t.namespaced && msg.namespace != m.namespace {
+		if t, ok := m.tabNamed(msg.Tab); ok && t.namespaced && msg.Namespace != m.namespace {
 			return m, nil
 		}
-		if msg.err != nil {
-			m.err = msg.err
+		if msg.Err != nil {
+			m.err = msg.Err
 			return m, nil
 		}
 		m.err = nil
-		m.items[msg.tab] = msg.rows
-		m.updated[msg.tab] = msg.at
+		m.items[msg.Tab] = msg.Rows
+		m.updated[msg.Tab] = msg.At
 
 		// A refresh can return fewer rows (a node was removed, or fewer
 		// match the search): keep the cursor on a row that still exists.
-		if msg.tab == m.activeName() {
+		if msg.Tab == m.activeName() {
 			if n := len(m.rows()); m.cursor >= n {
 				m.cursor = max(n-1, 0)
 			}
@@ -60,7 +64,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.onContainersLoaded(msg)
 
 	// An action finished (actions.go).
-	case actionDoneMsg:
+	case commands.ActionDoneMsg:
 		return m.onActionDone(msg)
 
 	case tea.KeyMsg:

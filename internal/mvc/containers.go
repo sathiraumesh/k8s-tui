@@ -4,6 +4,7 @@ import (
 	"context"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -18,9 +19,6 @@ import (
 // The choice goes to the action as its input: a container's name, or
 // allContainers.
 
-// allContainers is the picker's first choice, and the input for it.
-const allContainers = "*"
-
 // containersLoadedMsg brings the containers of the pod to pick from.
 type containersLoadedMsg struct {
 	target string // "NAMESPACE/NAME", to ignore a late answer for another pod
@@ -33,7 +31,7 @@ func loadContainers(c *k8s.Client, target string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), apiTimeout)
 		defer cancel()
-		namespace, name := splitTarget(target)
+		namespace, name := commands.SplitTarget(target)
 		names, err := c.PodContainers(ctx, namespace, name)
 		return containersLoadedMsg{target: target, names: names, err: err}
 	}
@@ -47,7 +45,7 @@ func (m Model) onContainersLoaded(msg containersLoadedMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.err != nil || len(msg.names) < 2 {
-		m.input = allContainers
+		m.input = commands.AllContainers
 		return m.afterPick()
 	}
 	m.containers = msg.names
@@ -58,7 +56,7 @@ func (m Model) onContainersLoaded(msg containersLoadedMsg) (Model, tea.Cmd) {
 
 // containerChoices are what the picker offers: all containers, then each.
 func (m Model) containerChoices() []string {
-	return append([]string{allContainers}, m.containers...)
+	return append([]string{commands.AllContainers}, m.containers...)
 }
 
 // onContainersKey handles a key in the picker.
@@ -84,12 +82,4 @@ func (m Model) containerRows() []string {
 	rows := m.containerChoices()
 	rows[0] = "all containers"
 	return rows
-}
-
-// containerArgs writes the choice as kubectl takes it.
-func containerArgs(input string) string {
-	if input == allContainers {
-		return "--all-containers"
-	}
-	return "--container=" + input
 }

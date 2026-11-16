@@ -2,6 +2,7 @@ package mvc
 
 import (
 	"fmt"
+	"k8s-tui/internal/mvc/commands"
 	"strings"
 	"testing"
 
@@ -193,7 +194,7 @@ func TestResizeKeepsCursorVisible(t *testing.T) {
 func TestShorterListAfterRefresh(t *testing.T) {
 	m := inList(t, longList(t, 30))
 	m = press(t, m, pgDown, pgDown, pgDown) // near the end
-	m = press(t, m, itemsLoadedMsg{tab: "Nodes", rows: []string{"node-0", "node-1", "node-2"}})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: "Nodes", Rows: []string{"node-0", "node-1", "node-2"}})
 	if m.cursor != 2 || m.offset != 0 {
 		t.Errorf("cursor = %d, offset = %d, want 2 and 0", m.cursor, m.offset)
 	}

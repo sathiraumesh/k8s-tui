@@ -7,6 +7,7 @@ import (
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
+	"k8s-tui/internal/mvc/commands"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -18,7 +19,7 @@ func podsOnScreen(t *testing.T) (Model, *fake.Clientset) {
 	cs := podsClient()
 	m := sized(t, New(k8s.NewClientFromClientset(cs)), 120, 30)
 	m.active = 1
-	m = press(t, m, itemsLoadedMsg{tab: tabPods, rows: []string{"default   web   1/1   Running   0   3h"}, at: time.Now()})
+	m = press(t, m, commands.ItemsLoadedMsg{Tab: tabPods, Rows: []string{"default   web   1/1   Running   0   3h"}, At: time.Now()})
 	return m, cs
 }
 
@@ -100,7 +101,7 @@ func TestRunPodRuns(t *testing.T) {
 		t.Errorf("pod = %+v, err = %v", p, err)
 	}
 	// Back on the list, enter is for a pod's actions again, not the images.
-	if m.tabActions || m.actions()[0].name != "Describe" {
+	if m.tabActions || m.actions()[0].Name != "Describe" {
 		t.Error("the image list is still the tab's actions after running")
 	}
 }
@@ -147,7 +148,7 @@ func TestImageName(t *testing.T) {
 		"ghcr.io/org/app@sha256:abc":     "app",
 		"redis":                          "redis",
 	} {
-		if got := imageName(image); got != want {
+		if got := commands.ImageName(image); got != want {
 			t.Errorf("imageName(%q) = %q, want %q", image, got, want)
 		}
 	}
@@ -156,11 +157,11 @@ func TestImageName(t *testing.T) {
 // Every image action has its own key, not one the action list moves with.
 func TestRunPodActionsKeys(t *testing.T) {
 	seen := map[string]bool{}
-	for _, a := range runPodActions() {
-		if seen[a.key] || a.key == KeyJ || a.key == KeyK {
-			t.Errorf("key %q of %s is used twice or moves the list", a.key, a.name)
+	for _, a := range commands.RunPodActions() {
+		if seen[a.Key] || a.Key == KeyJ || a.Key == KeyK {
+			t.Errorf("key %q of %s is used twice or moves the list", a.Key, a.Name)
 		}
-		seen[a.key] = true
+		seen[a.Key] = true
 	}
 }
 
