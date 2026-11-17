@@ -74,6 +74,7 @@ func Views() []View {
 		endpointSlicesView(),
 		leasesView(),
 		controllerRevisionsView(),
+		podTemplatesView(),
 	}
 }
 

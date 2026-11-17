@@ -197,6 +197,7 @@ plus their own:
 | endpointslices | `More › endpointslice` | also read by Services › `p` Endpoints |
 | leases | `More › lease` | only the generic actions |
 | controllerrevisions | `More › controllerrevision` | only the generic actions (rollout history reads them) |
+| podtemplates | `More › podtemplate` | only the generic actions |
 
 
 The status column of a row is colored by how things are:
