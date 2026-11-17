@@ -238,6 +238,7 @@ plus their own:
 | workloads | `More › workload` | only the generic actions (beta) |
 | compositepodgroups | `More › compositepodgroup` | only the generic actions (alpha) |
 | evictions | `More › eviction` | only the generic actions (alpha) |
+| evictionrequests | `More › evictionrequest` | only the generic actions (alpha) |
 
 
 The status column of a row is colored by how things are:
