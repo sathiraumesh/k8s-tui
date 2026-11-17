@@ -225,6 +225,7 @@ plus their own:
 | leasecandidates | `More › leasecandidate` | only the generic actions (beta) |
 | clustertrustbundles | `More › trustbundle` | only the generic actions (stable since v1.37) |
 | podcertificaterequests | `More › podcertrequest` | only the generic actions (stable since v1.37) |
+| ipaddresses | `More › ip` | only the generic actions |
 
 
 The status column of a row is colored by how things are:
