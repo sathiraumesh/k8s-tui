@@ -63,6 +63,7 @@ func Views() []View {
 		podDisruptionBudgetsView(),
 		priorityClassesView(),
 		resourceQuotasView(),
+		limitRangesView(),
 	}
 }
 

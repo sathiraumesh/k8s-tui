@@ -187,6 +187,7 @@ plus their own:
 | poddisruptionbudgets | `More › pdb` | `+ create`: `web app=web 1` (name, selector, min available: a number or `50%`) |
 | priorityclasses | `More › pc` | `+ create`: `high 1000` (name, value) |
 | resourcequotas | `More › quota` | `+ create`: `team pods=10 requests.cpu=4 limits.memory=8Gi` |
+| limitranges | `More › limits` | `+ create` container defaults: `defaults 500m 256Mi` (CPU and memory for containers that ask for none) |
 
 
 The status column of a row is colored by how things are:
