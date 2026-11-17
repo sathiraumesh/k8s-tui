@@ -105,6 +105,7 @@ func Views() []View {
 		localSubjectAccessReviewsView(),
 		tokenReviewsView(),
 		leaseCandidatesView(),
+		clusterTrustBundlesView(),
 	}
 }
 

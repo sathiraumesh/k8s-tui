@@ -223,6 +223,7 @@ plus their own:
 | localsubjectaccessreviews | `More › can-they-here` | `+` Can they, in the namespace picked: `serviceaccount:apps:ci create deployments` |
 | tokenreviews | `More › token` | `+` Check token: paste one; whether the API server accepts it, and as whom |
 | leasecandidates | `More › leasecandidate` | only the generic actions (beta) |
+| clustertrustbundles | `More › trustbundle` | only the generic actions (stable since v1.37) |
 
 
 The status column of a row is colored by how things are:
