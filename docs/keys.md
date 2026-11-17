@@ -194,6 +194,7 @@ plus their own:
 | rolebindings | `More › rolebinding` | `+ create`: `viewers clusterrole:view user:alice group:devs serviceaccount:apps:ci` |
 | clusterrolebindings | `More › clusterrolebinding` | `+ create`: `admins clusterrole:cluster-admin user:alice` |
 | endpoints | `More › ep` | only the generic actions; replaced by EndpointSlices since v1.33 |
+| endpointslices | `More › endpointslice` | also read by Services › `p` Endpoints |
 
 
 The status column of a row is colored by how things are:
