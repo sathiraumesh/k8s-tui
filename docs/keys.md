@@ -241,6 +241,7 @@ plus their own:
 | evictionrequests | `More › evictionrequest` | only the generic actions (alpha) |
 | storageversions | `More › storageversion` | only the generic actions (alpha); written by the API servers |
 | storageversionmigrations | `More › storagemigration` | only the generic actions |
+| bindings | `More › binding` | nothing to list; `+` Bind: `web worker1` puts a Pending pod on a node, as the scheduler would |
 
 
 The status column of a row is colored by how things are:
