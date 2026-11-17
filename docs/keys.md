@@ -182,6 +182,7 @@ plus their own:
 | ingresses | `More › ing` | `+ create` from rules `HOST/PATH=SERVICE:PORT` (`shop shop.example.com/*=web:80`; a path ending in `*` is a prefix) |
 | storageclasses | `More › sc` | `m` Make default (the old default stops being it) |
 | ingressclasses | `More › ingressclass` | `m` Make default |
+| networkpolicies | `More › netpol` | `+ create`: deny all ingress, or allow only the same namespace, for every pod of the namespace (needs a plugin that enforces policies) |
 
 
 The status column of a row is colored by how things are:

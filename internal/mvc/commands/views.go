@@ -58,6 +58,7 @@ func Views() []View {
 		ingressesView(),
 		storageClassesView(),
 		ingressClassesView(),
+		networkPoliciesView(),
 	}
 }
 
