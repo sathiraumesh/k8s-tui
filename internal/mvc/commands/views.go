@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"cmp"
 	"context"
 	"strings"
 	"time"
@@ -31,6 +32,10 @@ type View struct {
 	// One with the key of a generic action takes its place.
 	Actions []Action
 
+	// DeleteAbout, if set, says what Delete does to this kind, e.g. that
+	// deleting a namespace deletes everything in it.
+	DeleteAbout string
+
 	// Own are the actions of the view itself (making one), with the button
 	// that opens them and their title; nil for none.
 	Own       []Action
@@ -43,6 +48,7 @@ func Views() []View {
 	return []View{
 		configMapsView(),
 		secretsView(),
+		namespacesView(),
 	}
 }
 
@@ -180,7 +186,7 @@ func (v View) genericActions() []Action {
 			},
 		},
 		{
-			Key: "r", Name: "Delete", About: "remove it",
+			Key: "r", Name: "Delete", About: cmp.Or(v.DeleteAbout, "remove it"),
 			Changes: true,
 			Flags:   []Flag{{Name: FlagDryRun}},
 			Command: "kubectl delete " + t.Arg() + " %s",

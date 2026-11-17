@@ -34,3 +34,17 @@ func TestListNamespacesError(t *testing.T) {
 		t.Error("err = nil, want forbidden")
 	}
 }
+
+func TestCreateNamespace(t *testing.T) {
+	cs := fake.NewClientset()
+	c := NewClientFromClientset(cs)
+	if err := c.CreateNamespace(context.Background(), "shop", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.CoreV1().Namespaces().Get(context.Background(), "shop", metav1.GetOptions{}); err != nil {
+		t.Errorf("no namespace: %v", err)
+	}
+	if err := c.CreateNamespace(context.Background(), "Shop.Front", false); err == nil {
+		t.Error("bad name: err = nil")
+	}
+}

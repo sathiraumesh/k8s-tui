@@ -60,6 +60,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case namespacesLoadedMsg:
 		return m.onNamespacesLoaded(msg), nil
 
+	// Use on a namespace (More › ns): it becomes the one picked (namespace.go).
+	case commands.UseNamespaceMsg:
+		return m.onUseNamespace(msg), nil
+
 	// The containers of the pod to pick from arrived (containers.go).
 	case containersLoadedMsg:
 		return m.onContainersLoaded(msg)

@@ -105,20 +105,39 @@ func (m Model) pickNamespace(i int) (Model, tea.Cmd) {
 	if i < 0 || i >= len(choices) {
 		return m, nil
 	}
-	m.namespace = allNamespaces
+	namespace := allNamespaces
 	if i > 0 {
-		m.namespace = choices[i]
+		namespace = choices[i]
 	}
+	m = m.setNamespace(namespace)
+	m.err = nil
+	m.cursor, m.offset = 0, 0
+	m = m.closeOverlay()
+	return m, m.loadActive()
+}
+
+// setNamespace makes namespace the one the namespaced tabs and views
+// show. Their rows are from the old one, so they show "loading..." until
+// each is loaded again.
+func (m Model) setNamespace(namespace string) Model {
+	m.namespace = namespace
 	for _, t := range append(append([]tab{}, m.tabs...), m.kinds...) {
 		if t.namespaced {
 			m.items[t.name] = []string{"loading..."}
 			delete(m.updated, t.name)
 		}
 	}
-	m.err = nil
-	m.cursor, m.offset = 0, 0
+	return m
+}
+
+// onUseNamespace handles Use on a namespace (More › ns): it becomes the
+// namespace picked, as if picked with the ns button. The namespaces
+// themselves aren't in one, so the list on screen stays.
+func (m Model) onUseNamespace(msg commands.UseNamespaceMsg) Model {
+	m = m.setNamespace(msg.Namespace)
 	m = m.closeOverlay()
-	return m, m.loadActive()
+	m.notice = "namespace: " + msg.Namespace + " (the ns button shows it on the tabs in a namespace)"
+	return m
 }
 
 // onNamespacesKey handles a key in the picker.

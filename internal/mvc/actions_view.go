@@ -164,6 +164,9 @@ func (m Model) overlayTitle() string {
 	case overlayContainers:
 		return m.chosen().Name + " " + m.target + ": container"
 	case overlayConfirm, overlayText:
+		if m.tabActions && m.target == "" {
+			return m.activeTab().ownTitle // making something not in a namespace, e.g. "Create a namespace"
+		}
 		if m.tabActions {
 			return m.chosen().Name + " in " + m.target
 		}
