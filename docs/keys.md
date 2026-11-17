@@ -202,6 +202,7 @@ plus their own:
 | componentstatuses | `More › cs` | STATUS colored (Healthy green, Unhealthy red); deprecated, read-only |
 | apiservices | `More › apiservice` | AVAILABLE colored (True green, False red: its server doesn't answer) |
 | runtimeclasses | `More › runtimeclass` | only the generic actions |
+| csidrivers | `More › csidriver` | only the generic actions |
 
 
 The status column of a row is colored by how things are:

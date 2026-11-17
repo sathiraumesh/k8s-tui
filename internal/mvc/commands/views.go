@@ -79,6 +79,7 @@ func Views() []View {
 		componentStatusesView(),
 		apiServicesView(),
 		runtimeClassesView(),
+		csiDriversView(),
 	}
 }
 
