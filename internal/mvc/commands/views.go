@@ -81,6 +81,7 @@ func Views() []View {
 		runtimeClassesView(),
 		csiDriversView(),
 		csiNodesView(),
+		csiStorageCapacitiesView(),
 	}
 }
 
