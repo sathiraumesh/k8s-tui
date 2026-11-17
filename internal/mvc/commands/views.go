@@ -57,6 +57,7 @@ func Views() []View {
 		cronJobsView(),
 		ingressesView(),
 		storageClassesView(),
+		ingressClassesView(),
 	}
 }
 
