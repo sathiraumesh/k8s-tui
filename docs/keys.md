@@ -177,6 +177,7 @@ plus their own:
 | statefulsets | `More › sts` | READY colored; `c` Scale, `t` Restart (one pod at a time, the highest first), `i` Set image; Delete keeps their storage |
 | daemonsets | `More › ds` | `t` Restart (node by node), `i` Set image; no Scale: there is one pod per node |
 | replicasets | `More › rs` | `c` Scale (a deployment that owns it sets it back) |
+| jobs | `More › job` | STATUS colored (Complete green, Running/Suspended yellow, Failed red); `o` Logs of its pods; `p` Suspend, `u` Resume; `+ create`: `hello busybox echo hi` |
 
 
 The status column of a row is colored by how things are:

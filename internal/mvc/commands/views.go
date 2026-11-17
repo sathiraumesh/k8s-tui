@@ -53,6 +53,7 @@ func Views() []View {
 		statefulSetsView(),
 		daemonSetsView(),
 		replicaSetsView(),
+		jobsView(),
 	}
 }
 

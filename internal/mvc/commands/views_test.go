@@ -51,3 +51,22 @@ func TestViewNamesAndTargets(t *testing.T) {
 		}
 	}
 }
+
+// No action of a view can have j or k for its key: they move the cursor in
+// an action list. And no two actions of a list share a key.
+func TestViewKeysUsable(t *testing.T) {
+	for _, v := range Views() {
+		for _, list := range [][]Action{v.AllActions(), v.Own} {
+			seen := map[string]bool{}
+			for _, a := range list {
+				if a.Key == "j" || a.Key == "k" {
+					t.Errorf("%s: %s has key %q, which moves the cursor", v.Name(), a.Name, a.Key)
+				}
+				if seen[a.Key] {
+					t.Errorf("%s: two actions have key %q", v.Name(), a.Key)
+				}
+				seen[a.Key] = true
+			}
+		}
+	}
+}
