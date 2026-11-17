@@ -83,11 +83,11 @@ func TestWheelMovesActionCursor(t *testing.T) {
 	}
 }
 
-// Clicks and releases do nothing.
+// The middle button, and a release without a press, do nothing.
 func TestMouseClickIgnored(t *testing.T) {
 	m := manyRows(t, 5)
-	m = press(t, m, tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft},
-		tea.MouseMsg{Action: tea.MouseActionRelease, Button: tea.MouseButtonWheelDown})
+	m = press(t, m, tea.MouseMsg{X: 10, Y: 6, Action: tea.MouseActionPress, Button: tea.MouseButtonMiddle},
+		tea.MouseMsg{X: 10, Y: 6, Action: tea.MouseActionRelease, Button: tea.MouseButtonMiddle})
 	if m.focus != focusTabs || m.cursor != 0 {
 		t.Errorf("focus = %d, cursor = %d, want nothing changed", m.focus, m.cursor)
 	}
@@ -112,10 +112,29 @@ func at(t *testing.T, m Model, text string) (x, y int) {
 func click(t *testing.T, m Model, text string) Model {
 	t.Helper()
 	x, y := at(t, m, text)
-	return press(t, m, tea.MouseMsg{X: x + ansi.StringWidth(text)/2, Y: y, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	return clickAt(t, m, x+ansi.StringWidth(text)/2, y)
 }
 
-var rightClick = tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonRight}
+// clickAt is a left click, press and release, at (x, y).
+func clickAt(t *testing.T, m Model, x, y int) Model {
+	t.Helper()
+	next, cmd := clickAtCmd(m, x, y)
+	_ = cmd
+	return next
+}
+
+// clickAtCmd is clickAt, with the command the release returned.
+func clickAtCmd(m Model, x, y int) (Model, tea.Cmd) {
+	next, _ := m.Update(tea.MouseMsg{X: x, Y: y, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	next, cmd := next.(Model).Update(tea.MouseMsg{X: x, Y: y, Action: tea.MouseActionRelease, Button: tea.MouseButtonLeft})
+	return next.(Model), cmd
+}
+
+// rightClickAt is a right click at (x, y): it opens the menu.
+func rightClickAt(t *testing.T, m Model, x, y int) Model {
+	t.Helper()
+	return press(t, m, tea.MouseMsg{X: x, Y: y, Action: tea.MouseActionPress, Button: tea.MouseButtonRight})
+}
 
 func TestClickTab(t *testing.T) {
 	m := click(t, manyRows(t, 3), "Services")
@@ -148,7 +167,7 @@ func TestClickRowThenActions(t *testing.T) {
 	}
 }
 
-// Clicks pick an action, tick a flag and run it; right click goes back.
+// Clicks pick an action, tick a flag and run it; Back on the right-click menu goes back.
 func TestClickConfirmPage(t *testing.T) {
 	m, cs := nodesOnScreen(t) // cursor on worker2
 	m = press(t, m, enterKey)
@@ -160,12 +179,13 @@ func TestClickConfirmPage(t *testing.T) {
 	if !commands.Ticked(m.flags, commands.FlagDryRun) {
 		t.Fatal("clicking the tick box didn't tick it")
 	}
-	if m = press(t, m, rightClick); m.overlay != overlayActions {
-		t.Fatalf("right click: overlay = %d, want back on the actions", m.overlay)
+	m = rightClickAt(t, m, 10, 10)
+	if m = click(t, m, "Back"); m.overlay != overlayActions || m.menu != nil {
+		t.Fatalf("menu Back: overlay = %d, want back on the actions", m.overlay)
 	}
 	m = click(t, m, "Cordon")
-	next, cmd := m.Update(tea.MouseMsg{X: 5, Y: lastRowY(t, m, "y run"), Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
-	m = run(t, next.(Model), cmd)
+	next, cmd := clickAtCmd(m, 5, lastRowY(t, m, "y run"))
+	m = run(t, next, cmd)
 	if m.notice != "Cordon worker2: done" {
 		t.Errorf("notice = %q", m.notice)
 	}

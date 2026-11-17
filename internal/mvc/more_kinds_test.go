@@ -77,8 +77,8 @@ func TestVolumesClickBack(t *testing.T) {
 		t.Error("a click on More didn't go back")
 	}
 	m, _ = openVolumes(t)
-	if m = press(t, m, rightClick); m.inKind() {
-		t.Error("a right click didn't go back")
+	if m = click(t, rightClickAt(t, m, 10, 10), "Back"); m.inKind() {
+		t.Error("Back on the right-click menu didn't go back")
 	}
 }
 

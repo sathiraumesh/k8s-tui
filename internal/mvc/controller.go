@@ -1,6 +1,7 @@
 package mvc
 
 import (
+	"fmt"
 	"k8s-tui/internal/mvc/commands"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -63,6 +64,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case containersLoadedMsg:
 		return m.onContainersLoaded(msg)
 
+	// Text was copied to the clipboard (clipboard.go).
+	case copiedMsg:
+		m.notice = fmt.Sprintf("copied %d characters", msg.chars)
+		return m, nil
+
 	// An action finished (actions.go).
 	case commands.ActionDoneMsg:
 		return m.onActionDone(msg)
@@ -79,7 +85,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		m.notice = "" // a key press clears the last action's message
+		if m.menu != nil {
+			return m.onMenuKey(msg) // the right-click menu (contextmenu.go)
+		}
+		m.sel = nil   // a key press clears the text selected with the mouse
+		m.notice = "" // and the last action's message
 		if m.overlay != overlayNone {
 			return m.onOverlayKey(msg)
 		}

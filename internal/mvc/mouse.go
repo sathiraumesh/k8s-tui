@@ -18,15 +18,18 @@ import (
 //	             the text field        puts the cursor there to type
 //	             a tick box            ticks or unticks it
 //	             the last line         runs the action ("y run" / "enter run")
-//	right click  goes back, like esc
+//	drag         selects text, as in the terminal, and copies it (selection.go)
+//	right click  a menu: copy the selection, the row, everything, the
+//	             command, or go back (contextmenu.go)
 //
 // Unlike ↑ on the top row, the wheel never takes the cursor out of the
 // panel to the buttons or the tabs. Without the app reading the mouse, the
 // terminal sends ↑ and ↓ for the wheel, several per step, so the cursor
 // jumped rows and, at the top, left the panel.
 //
-// The mouse is read with tea.WithMouseCellMotion (internal/app); while it
-// is, most terminals leave selecting text to shift+drag.
+// The app reads the mouse (tea.WithMouseCellMotion, internal/app), so the
+// terminal doesn't select text or show its menu itself: the app does both,
+// the same way. K8S_TUI_MOUSE=0 leaves the mouse to the terminal.
 
 // Where things are on the screen, from the top, as View draws them:
 //
@@ -65,19 +68,70 @@ func (m Model) onMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.splash || m.width == 0 {
 		return m, nil // nothing on screen to point at yet
 	}
+	if m.menu != nil {
+		return m.onMenuMouse(msg)
+	}
 	if step := wheelStep(msg); step != 0 {
+		m.sel = nil // the text under it moves
 		return m.onWheel(step)
 	}
+	at := point{x: max(min(msg.X, m.width-1), 0), y: max(min(msg.Y, m.height-1), 0)}
+
+	switch {
+	// The left button down: a click or the start of a drag, known when it
+	// is let go (selection.go).
+	case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft:
+		m.sel, m.press, m.dragging = nil, &at, false
+		return m, nil
+
+	// Moved while held: a drag, selecting from where it went down.
+	case msg.Action == tea.MouseActionMotion && m.press != nil:
+		if at != *m.press || m.dragging {
+			m.dragging = true
+			m.sel = &selection{from: *m.press, to: at}
+		}
+		return m, nil
+
+	// Let go: the end of a drag copies what it selected; else it was a click.
+	case msg.Action == tea.MouseActionRelease && m.press != nil:
+		start := *m.press
+		m.press = nil
+		if m.dragging {
+			m.dragging = false
+			if text := m.selectedText(); text != "" {
+				return m, copyToClipboard(text)
+			}
+			m.sel = nil
+			return m, nil
+		}
+		m.notice = "" // like a key press, a click clears the last action's message
+		return m.onClick(start.x, start.y)
+
+	// The right button: the menu (contextmenu.go).
+	case msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonRight:
+		m.notice = ""
+		return m.openMenu(at.x, at.y), nil
+	}
+	return m, nil
+}
+
+// onMenuMouse handles the mouse while the right-click menu is open: a click
+// on an item picks it, a click elsewhere closes the menu, a right click
+// opens it again where it is.
+func (m Model) onMenuMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if msg.Action != tea.MouseActionPress {
-		return m, nil // releases and drags
+		return m, nil
 	}
 	switch msg.Button {
 	case tea.MouseButtonLeft:
-		m.notice = "" // like a key press, a click clears the last action's message
-		return m.onClick(msg.X, msg.Y)
+		if i := m.menuItemAt(msg.X, msg.Y); i >= 0 {
+			return m.pickMenu(i)
+		}
+		m.menu = nil
 	case tea.MouseButtonRight:
-		m.notice = ""
-		return m.back()
+		return m.openMenu(msg.X, msg.Y), nil
+	default:
+		m.menu = nil // the wheel
 	}
 	return m, nil
 }

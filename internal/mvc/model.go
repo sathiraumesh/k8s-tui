@@ -141,6 +141,15 @@ type Model struct {
 	kinds                  []tab
 	moreKind               string
 	moreCursor, moreOffset int
+
+	// The mouse (mouse.go, selection.go, contextmenu.go): press is where the
+	// left button went down while it is held, dragging whether it has moved
+	// since, sel the text selected (nil for none), and menu the right-click
+	// menu while it is open.
+	press    *point
+	dragging bool
+	sel      *selection
+	menu     *contextMenu
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each

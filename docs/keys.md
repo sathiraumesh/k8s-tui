@@ -170,10 +170,16 @@ tab's `error: …` row red. Show (labels and annotations) isn't colored.
 | click the text field | puts the cursor there to type |
 | click a tick box | ticks or unticks it |
 | click the last line (`y run` / `enter run`) | runs the action |
-| right click | back, like `esc` |
+| drag | selects text, as in the terminal, and copies it when you let go; it stays shown until the next key or click |
+| right click | a menu where you clicked: **Copy** (the selection), **Copy row**, **Copy all** (every row, also those off screen), **Copy command** (the kubectl command), **Back** (on a page) |
 
-While the app reads the mouse, select text with `shift`+drag (most
-terminals).
+Copying uses OSC 52: the app asks the terminal to put the text on the
+clipboard, so it works without a clipboard program and over ssh. A
+terminal without OSC 52 ignores it. To paste into a text field, use the
+terminal's paste (`ctrl+shift+v`).
+
+`K8S_TUI_MOUSE=0` leaves the mouse to the terminal instead: its own
+selection and right-click menu, and the wheel as ↑/↓.
 
 ## Anywhere
 

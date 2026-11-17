@@ -83,7 +83,33 @@ func (c panelContent) drawRow(line string, base lipgloss.Style, selected bool, w
 	return pad(base, width).Render(line)
 }
 
+// View draws the screen, with the text selected with the mouse and the
+// right-click menu on top (selection.go, contextmenu.go).
 func (m Model) View() string {
+	s := m.screen()
+	if m.width == 0 || m.splash || (m.sel == nil && m.menu == nil) {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	if m.sel != nil {
+		lines = m.sel.highlight(lines, m.width)
+	}
+	if m.menu != nil {
+		lines = m.menu.draw(lines, m.width, m.height)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// selectedText is the text of the screen the selection covers.
+func (m Model) selectedText() string {
+	if m.sel == nil {
+		return ""
+	}
+	return m.sel.text(strings.Split(m.screen(), "\n"), m.width)
+}
+
+// screen draws the screen: the tabs, the panel and the help line.
+func (m Model) screen() string {
 	if m.width == 0 {
 		return "loading..."
 	}

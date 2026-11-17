@@ -30,8 +30,14 @@ func New() *App {
 
 // Run starts the TUI full-screen and blocks until the user quits.
 func (a *App) Run() error {
-	// The mouse is read so its wheel scrolls one row a step (mvc/mouse.go).
-	p := tea.NewProgram(a.state, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	// The app reads the mouse (mvc/mouse.go): clicks, the wheel one row a
+	// step, dragging to select and copy, and a right-click menu. With
+	// K8S_TUI_MOUSE=0 the mouse is left to the terminal.
+	opts := []tea.ProgramOption{tea.WithAltScreen()}
+	if os.Getenv("K8S_TUI_MOUSE") != "0" {
+		opts = append(opts, tea.WithMouseCellMotion())
+	}
+	p := tea.NewProgram(a.state, opts...)
 	_, err := p.Run()
 	return err
 }
