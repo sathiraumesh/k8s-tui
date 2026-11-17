@@ -104,6 +104,7 @@ func Views() []View {
 		subjectAccessReviewsView(),
 		localSubjectAccessReviewsView(),
 		tokenReviewsView(),
+		leaseCandidatesView(),
 	}
 }
 
