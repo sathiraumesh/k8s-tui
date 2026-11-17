@@ -214,6 +214,7 @@ plus their own:
 | validatingadmissionpolicybindings | `More › validatingpolicybinding` | only the generic actions |
 | mutatingadmissionpolicies | `More › mutatingpolicy` | only the generic actions (stable since v1.36) |
 | mutatingadmissionpolicybindings | `More › mutatingpolicybinding` | only the generic actions |
+| certificatesigningrequests | `More › csr` | CONDITION colored (Approved green, Pending yellow, Denied/Failed red); `a` Approve, `n` Deny, like `kubectl certificate approve` |
 
 
 The status column of a row is colored by how things are:
