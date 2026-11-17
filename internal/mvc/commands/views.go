@@ -66,6 +66,7 @@ func Views() []View {
 		limitRangesView(),
 		eventsView(),
 		eventsK8sIOView(),
+		rolesView(),
 	}
 }
 

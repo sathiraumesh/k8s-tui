@@ -189,6 +189,7 @@ plus their own:
 | resourcequotas | `More › quota` | `+ create`: `team pods=10 requests.cpu=4 limits.memory=8Gi` |
 | limitranges | `More › limits` | `+ create` container defaults: `defaults 500m 256Mi` (CPU and memory for containers that ask for none) |
 | events (v1 and events.k8s.io) | `More › events` | TYPE colored (Warning yellow); each event's name is put first |
+| roles | `More › role` | `+ create`: `reader get,list,watch pods,deployments` (the API group of each resource is found, as kubectl does) |
 
 
 The status column of a row is colored by how things are:
