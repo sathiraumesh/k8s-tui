@@ -113,6 +113,7 @@ func Views() []View {
 		deviceClassesView(),
 		deviceTaintRulesView(),
 		resourceClaimsView(),
+		resourceClaimTemplatesView(),
 	}
 }
 
