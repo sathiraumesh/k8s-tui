@@ -83,6 +83,7 @@ func Views() []View {
 		csiNodesView(),
 		csiStorageCapacitiesView(),
 		volumeAttachmentsView(),
+		flowSchemasView(),
 	}
 }
 
