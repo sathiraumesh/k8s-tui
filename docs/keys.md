@@ -227,6 +227,7 @@ plus their own:
 | podcertificaterequests | `More › podcertrequest` | only the generic actions (stable since v1.37) |
 | ipaddresses | `More › ip` | only the generic actions |
 | servicecidrs | `More › servicecidr` | only the generic actions |
+| volumeattributesclasses | `More › vac` | only the generic actions |
 
 
 The status column of a row is colored by how things are:

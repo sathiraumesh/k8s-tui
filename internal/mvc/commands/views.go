@@ -109,6 +109,7 @@ func Views() []View {
 		podCertificateRequestsView(),
 		ipAddressesView(),
 		serviceCIDRsView(),
+		volumeAttributesClassesView(),
 	}
 }
 
