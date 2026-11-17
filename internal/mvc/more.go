@@ -80,6 +80,27 @@ func viewTab(v commands.View) tab {
 	return t
 }
 
+// servedVersion makes the view of the More row in the version the row
+// says the cluster serves (commands.ViewFor), if it is a generic view.
+func (m Model) servedVersion(row string) Model {
+	_, apiVersion, kind, ok := commands.ResourceOf(row)
+	if !ok {
+		return m
+	}
+	v, ok := commands.ViewFor(apiVersion, kind)
+	if !ok {
+		return m
+	}
+	kinds := append([]tab{}, m.kinds...) // a copy: m.kinds is shared with copies of the model
+	for i, t := range kinds {
+		if t.name == v.Name() {
+			kinds[i] = viewTab(v)
+		}
+	}
+	m.kinds = kinds
+	return m
+}
+
 // kindTab is the view of More called name.
 func (m Model) kindTab(name string) (tab, bool) {
 	for _, t := range m.kinds {

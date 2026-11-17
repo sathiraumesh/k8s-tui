@@ -1,12 +1,16 @@
 package mvc
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	k8s "k8s-tui/internal/kubernetes"
 	"k8s-tui/internal/mvc/commands"
+
+	"k8s.io/client-go/rest"
 )
 
 // withView is a model on More with view open in it, its rows loaded.
@@ -52,5 +56,22 @@ func TestGenericView(t *testing.T) {
 		if got := next.kubectlCommand(); got != want {
 			t.Errorf("%s: %q, want %q", k, got, want)
 		}
+	}
+}
+
+// Opened from a row of an older version, the view lists that version.
+func TestViewOpensServedVersion(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		w.Write([]byte(`{"kind":"Table","apiVersion":"meta.k8s.io/v1","columnDefinitions":[],"rows":[]}`))
+	}))
+	defer srv.Close()
+	c, _ := k8s.NewClientFromConfig(&rest.Config{Host: srv.URL}, "")
+	m := New(c).servedVersion("statefulsets   sts   apps/v1beta2   true   StatefulSet")
+	sts, _ := m.kindTab("statefulsets.apps")
+	sts.load(c, false, "")()
+	if path != "/apis/apps/v1beta2/statefulsets" {
+		t.Errorf("asked %q, want the version the row said", path)
 	}
 }

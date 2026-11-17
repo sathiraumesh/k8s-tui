@@ -227,10 +227,18 @@ func (v View) genericActions() []Action {
 	}
 }
 
-// viewFor is the view of the kind apiVersion/kind, if there is one.
-func viewFor(apiVersion, kind string) (View, bool) {
+// ViewFor is the view of the kind apiVersion/kind, if there is one, in that
+// version: a view is for its group and kind, and the cluster may serve
+// another version than the one it was written for (a v1beta1 before it
+// became v1).
+func ViewFor(apiVersion, kind string) (View, bool) {
+	group, version, ok := strings.Cut(apiVersion, "/")
+	if !ok {
+		group, version = "", apiVersion // the core group: "v1"
+	}
 	for _, v := range Views() {
-		if v.Type.APIVersion() == apiVersion && v.Type.Kind == kind {
+		if v.Type.Group == group && v.Type.Kind == kind {
+			v.Type.Version = version
 			return v, true
 		}
 	}

@@ -105,6 +105,7 @@ func (m Model) openRowTab() (Model, tea.Cmd) {
 		return m, nil
 	}
 	if _, isKind := m.kindTab(tab); isKind {
+		m = m.servedVersion(m.rows()[m.cursor])
 		return m.openKind(tab) // a view inside More, e.g. the volumes
 	}
 	for i, t := range m.tabs {

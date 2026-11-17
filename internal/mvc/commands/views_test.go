@@ -102,3 +102,15 @@ func TestCommandWithoutTarget(t *testing.T) {
 		t.Errorf("command = %q", got)
 	}
 }
+
+// A view opens in the version the cluster serves, which may not be the one
+// it was written for.
+func TestViewForServedVersion(t *testing.T) {
+	v, ok := ViewFor("apps/v1beta2", "StatefulSet")
+	if !ok || v.Type.Version != "v1beta2" || v.Type.Group != "apps" {
+		t.Errorf("view = %+v, %v", v.Type, ok)
+	}
+	if _, ok := ViewFor("example.com/v1", "StatefulSet"); ok {
+		t.Error("another group's StatefulSet has the view")
+	}
+}
