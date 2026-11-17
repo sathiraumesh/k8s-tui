@@ -200,6 +200,7 @@ plus their own:
 | podtemplates | `More › podtemplate` | only the generic actions |
 | replicationcontrollers | `More › rc` | `c` Scale |
 | componentstatuses | `More › cs` | STATUS colored (Healthy green, Unhealthy red); deprecated, read-only |
+| apiservices | `More › apiservice` | AVAILABLE colored (True green, False red: its server doesn't answer) |
 
 
 The status column of a row is colored by how things are:
