@@ -205,6 +205,7 @@ plus their own:
 | csidrivers | `More › csidriver` | only the generic actions |
 | csinodes | `More › csinode` | only the generic actions; written by the kubelet |
 | csistoragecapacities | `More › csistoragecapacity` | only the generic actions; written by CSI drivers |
+| volumeattachments | `More › volumeattachment` | only the generic actions; Delete detaches |
 
 
 The status column of a row is colored by how things are:

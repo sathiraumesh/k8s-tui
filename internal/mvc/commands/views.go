@@ -82,6 +82,7 @@ func Views() []View {
 		csiDriversView(),
 		csiNodesView(),
 		csiStorageCapacitiesView(),
+		volumeAttachmentsView(),
 	}
 }
 
