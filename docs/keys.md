@@ -185,6 +185,7 @@ plus their own:
 | networkpolicies | `More › netpol` | `+ create`: deny all ingress, or allow only the same namespace, for every pod of the namespace (needs a plugin that enforces policies) |
 | horizontalpodautoscalers | `More › hpa` | `+ create` for a deployment: `web 1 5 80` (min, max, CPU %), like `kubectl autoscale`; needs metrics-server |
 | poddisruptionbudgets | `More › pdb` | `+ create`: `web app=web 1` (name, selector, min available: a number or `50%`) |
+| priorityclasses | `More › pc` | `+ create`: `high 1000` (name, value) |
 
 
 The status column of a row is colored by how things are:
