@@ -24,18 +24,8 @@ func (c *Client) StatefulSetContainers(ctx context.Context, namespace, name stri
 // scale statefulset NAME --replicas=N -n NAMESPACE`. Scaling down removes
 // the highest-numbered pods first; their claims (and data) stay.
 func (c *Client) ScaleStatefulSet(ctx context.Context, namespace, name, replicas string, dryRun bool) (Change, error) {
-	n, err := parseReplicas(replicas)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := update(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, dryRun, func(s *appsv1.StatefulSet) error {
-		s.Spec.Replicas = &n
-		return nil
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: replicasText(before.Spec.Replicas), After: replicasText(after.Spec.Replicas)}, nil
+	return scaleWorkload(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, replicas, dryRun,
+		func(s *appsv1.StatefulSet) **int32 { return &s.Spec.Replicas })
 }
 
 // RestartStatefulSet replaces its pods one at a time, the highest first,

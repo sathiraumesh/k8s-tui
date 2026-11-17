@@ -129,18 +129,8 @@ func (c *Client) LabelDeployment(ctx context.Context, namespace, name string, ch
 // `kubectl scale deployment NAME -n NAMESPACE --replicas=N`. replicas is
 // as typed, a whole number from 0. It returns the replicas before and after.
 func (c *Client) ScaleDeployment(ctx context.Context, namespace, name, replicas string, dryRun bool) (Change, error) {
-	n, err := parseReplicas(replicas)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := update(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun, func(d *appsv1.Deployment) error {
-		d.Spec.Replicas = &n
-		return nil
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: replicasText(before.Spec.Replicas), After: replicasText(after.Spec.Replicas)}, nil
+	return scaleWorkload(ctx, c.clientset.AppsV1().Deployments(namespace), name, replicas, dryRun,
+		func(d *appsv1.Deployment) **int32 { return &d.Spec.Replicas })
 }
 
 // RestartDeployment replaces the deployment's pods one by one, like

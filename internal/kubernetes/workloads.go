@@ -100,3 +100,23 @@ func workloadContainers[T any](ctx context.Context, client getter[T], name strin
 	}
 	return templateContainers(template(obj).Spec, running), nil
 }
+
+// replicasOf gives where a T keeps its replicas, e.g. &s.Spec.Replicas.
+type replicasOf[T any] func(*T) **int32
+
+// scaleWorkload sets the replicas of the T called name (see
+// parseReplicas), and returns them before and after.
+func scaleWorkload[T any, P copyable[T]](ctx context.Context, client getUpdater[T], name, replicas string, dryRun bool, field replicasOf[T]) (Change, error) {
+	n, err := parseReplicas(replicas)
+	if err != nil {
+		return Change{}, err
+	}
+	before, after, err := update[T, P](ctx, client, name, dryRun, func(obj *T) error {
+		*field(obj) = &n
+		return nil
+	})
+	if err != nil {
+		return Change{}, err
+	}
+	return Change{Before: replicasText(*field(before)), After: replicasText(*field(after))}, nil
+}
