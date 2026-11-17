@@ -101,6 +101,25 @@ func (m Model) servedVersion(row string) Model {
 	return m
 }
 
+// onOpenView opens msg's view in More (a CRD's objects): it becomes one of
+// More's views, and is opened as if from More's list.
+func (m Model) onOpenView(msg commands.OpenViewMsg) (Model, tea.Cmd) {
+	t := viewTab(msg.View)
+	kinds := append([]tab{}, m.kinds...)
+	found := false
+	for i := range kinds {
+		if kinds[i].name == t.name {
+			kinds[i], found = t, true
+		}
+	}
+	if !found {
+		kinds = append(kinds, t)
+	}
+	m.kinds = kinds
+	m = m.closeOverlay()
+	return m.openKind(t.name)
+}
+
 // kindTab is the view of More called name.
 func (m Model) kindTab(name string) (tab, bool) {
 	for _, t := range m.kinds {

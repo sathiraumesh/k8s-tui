@@ -60,6 +60,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case namespacesLoadedMsg:
 		return m.onNamespacesLoaded(msg), nil
 
+	// Objects of a CRD: their view opens in More (more.go).
+	case commands.OpenViewMsg:
+		return m.onOpenView(msg)
+
 	// Use on a namespace (More › ns): it becomes the one picked (namespace.go).
 	case commands.UseNamespaceMsg:
 		return m.onUseNamespace(msg), nil

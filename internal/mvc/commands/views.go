@@ -92,6 +92,7 @@ func Views() []View {
 		mutatingAdmissionPoliciesView(),
 		mutatingAdmissionPolicyBindingsView(),
 		certificateSigningRequestsView(),
+		customResourceDefinitionsView(),
 	}
 }
 
