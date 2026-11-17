@@ -121,6 +121,7 @@ func Views() []View {
 		compositePodGroupsView(),
 		evictionsView(),
 		evictionRequestsView(),
+		storageVersionsView(),
 	}
 }
 

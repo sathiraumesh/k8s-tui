@@ -239,6 +239,7 @@ plus their own:
 | compositepodgroups | `More › compositepodgroup` | only the generic actions (alpha) |
 | evictions | `More › eviction` | only the generic actions (alpha) |
 | evictionrequests | `More › evictionrequest` | only the generic actions (alpha) |
+| storageversions | `More › storageversion` | only the generic actions (alpha); written by the API servers |
 
 
 The status column of a row is colored by how things are:
