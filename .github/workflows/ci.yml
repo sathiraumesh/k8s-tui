@@ -1,0 +1,99 @@
+# Tests every push and pull request, and builds k8s-tui for Linux, macOS
+# and Windows on amd64 (x86-64) and arm64. Publishing a release on GitHub
+# (Releases › Draft a new release › Publish release) builds them from its
+# tag and attaches them to it, with their checksums.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"; echo "$unformatted"; exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test -race ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tags, for git describe
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          # A release's tag (v1.2.3); else what git describes, e.g. v1.2.3-4-gabc1234.
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${RELEASE_TAG:-$(git describe --tags --always --dirty)}"
+          name="k8s-tui_${version}_${GOOS}_${GOARCH}"
+          exe=k8s-tui
+          [ "$GOOS" = windows ] && exe=k8s-tui.exe
+          mkdir -p "dist/$name"
+          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "dist/$name/$exe" .
+          cp README.md "dist/$name/"
+          cd dist
+          if [ "$GOOS" = windows ]; then
+            zip -qr "$name.zip" "$name"
+          else
+            tar -czf "$name.tar.gz" "$name"
+          fi
+          rm -r "$name"
+      - name: Check it runs
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP" && "$RUNNER_TEMP"/k8s-tui_*/k8s-tui --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: k8s-tui-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to attach the files to the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
