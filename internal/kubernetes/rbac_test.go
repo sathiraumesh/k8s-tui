@@ -45,3 +45,25 @@ func TestCreateRole(t *testing.T) {
 		t.Errorf("cluster role = %+v", cr.Rules)
 	}
 }
+
+func TestCreateBinding(t *testing.T) {
+	cs := fake.NewClientset()
+	c := NewClientFromClientset(cs)
+	if err := c.CreateBinding(context.Background(), "apps", "viewers", "clusterrole:view", []string{"user:alice", "group:devs", "serviceaccount:apps:ci"}, false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := cs.RbacV1().RoleBindings("apps").Get(context.Background(), "viewers", metav1.GetOptions{})
+	if b.RoleRef.Kind != "ClusterRole" || b.RoleRef.Name != "view" || len(b.Subjects) != 3 ||
+		b.Subjects[2].Kind != "ServiceAccount" || b.Subjects[2].Namespace != "apps" || b.Subjects[2].Name != "ci" {
+		t.Errorf("binding = %+v", b)
+	}
+	for _, bad := range []struct{ role, subject string }{{"view", "user:a"}, {"clusterrole:view", "alice"}, {"clusterrole:view", "serviceaccount:ci"}} {
+		if err := c.CreateBinding(context.Background(), "apps", "x", bad.role, []string{bad.subject}, false); err == nil {
+			t.Errorf("%+v: err = nil", bad)
+		}
+	}
+	// A cluster binding can't give a namespaced role.
+	if err := c.CreateBinding(context.Background(), "", "x", "role:reader", []string{"user:a"}, false); err == nil {
+		t.Error("cluster binding of a role: err = nil")
+	}
+}

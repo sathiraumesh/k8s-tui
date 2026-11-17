@@ -87,3 +87,72 @@ func (c *Client) CreateRole(ctx context.Context, namespace, name string, verbs, 
 	}
 	return err
 }
+
+// parseRoleRef reads the role a binding gives: "role:NAME" or
+// "clusterrole:NAME". A ClusterRoleBinding can only give a ClusterRole.
+func parseRoleRef(role string, cluster bool) (rbacv1.RoleRef, error) {
+	kind, name, ok := strings.Cut(role, ":")
+	switch {
+	case ok && name != "" && kind == "clusterrole":
+		return rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: name}, nil
+	case ok && name != "" && kind == "role" && !cluster:
+		return rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: name}, nil
+	case cluster:
+		return rbacv1.RoleRef{}, fmt.Errorf("role %q: type clusterrole:NAME, e.g. clusterrole:view", role)
+	}
+	return rbacv1.RoleRef{}, fmt.Errorf("role %q: type role:NAME or clusterrole:NAME", role)
+}
+
+// parseSubject reads who a binding is for: "user:NAME", "group:NAME" or
+// "serviceaccount:NAMESPACE:NAME".
+func parseSubject(s string) (rbacv1.Subject, error) {
+	kind, rest, _ := strings.Cut(s, ":")
+	switch kind {
+	case "user":
+		if rest != "" {
+			return rbacv1.Subject{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: rest}, nil
+		}
+	case "group":
+		if rest != "" {
+			return rbacv1.Subject{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: rest}, nil
+		}
+	case "serviceaccount":
+		if ns, name, ok := strings.Cut(rest, ":"); ok && ns != "" && name != "" {
+			return rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns, Name: name}, nil
+		}
+	}
+	return rbacv1.Subject{}, fmt.Errorf("subject %q: type user:NAME, group:NAME or serviceaccount:NAMESPACE:NAME", s)
+}
+
+// CreateBinding gives role (see parseRoleRef) to subjects (see
+// parseSubject) in namespace, or everywhere with a ClusterRoleBinding if
+// namespace is "", like `kubectl create rolebinding NAME --clusterrole=view
+// --user=alice -n NAMESPACE` (or `kubectl create clusterrolebinding`).
+func (c *Client) CreateBinding(ctx context.Context, namespace, name, role string, subjects []string, dryRun bool) error {
+	if errs := validation.IsDNS1123Subdomain(name); len(errs) > 0 {
+		return fmt.Errorf("binding name %q: %s", name, strings.Join(errs, "; "))
+	}
+	ref, err := parseRoleRef(role, namespace == "")
+	if err != nil {
+		return err
+	}
+	if len(subjects) == 0 {
+		return fmt.Errorf("no subject given: type user:NAME, group:NAME or serviceaccount:NAMESPACE:NAME")
+	}
+	var subs []rbacv1.Subject
+	for _, s := range subjects {
+		sub, err := parseSubject(s)
+		if err != nil {
+			return err
+		}
+		subs = append(subs, sub)
+	}
+	opts := metav1.CreateOptions{DryRun: dryRunOption(dryRun)}
+	meta := metav1.ObjectMeta{Name: name, Namespace: namespace}
+	if namespace == "" {
+		_, err = c.clientset.RbacV1().ClusterRoleBindings().Create(ctx, &rbacv1.ClusterRoleBinding{ObjectMeta: meta, RoleRef: ref, Subjects: subs}, opts)
+	} else {
+		_, err = c.clientset.RbacV1().RoleBindings(namespace).Create(ctx, &rbacv1.RoleBinding{ObjectMeta: meta, RoleRef: ref, Subjects: subs}, opts)
+	}
+	return err
+}

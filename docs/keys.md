@@ -191,6 +191,7 @@ plus their own:
 | events (v1 and events.k8s.io) | `More › events` | TYPE colored (Warning yellow); each event's name is put first |
 | roles | `More › role` | `+ create`: `reader get,list,watch pods,deployments` (the API group of each resource is found, as kubectl does) |
 | clusterroles | `More › clusterrole` | `+ create`: `node-reader get,list nodes` |
+| rolebindings | `More › rolebinding` | `+ create`: `viewers clusterrole:view user:alice group:devs serviceaccount:apps:ci` |
 
 
 The status column of a row is colored by how things are:
