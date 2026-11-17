@@ -108,6 +108,7 @@ func Views() []View {
 		clusterTrustBundlesView(),
 		podCertificateRequestsView(),
 		ipAddressesView(),
+		serviceCIDRsView(),
 	}
 }
 
