@@ -4,6 +4,7 @@ import (
 	"context"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 // Changing one object the way kubectl label, kubectl set image and the
@@ -29,16 +30,23 @@ type copyable[T any] interface {
 // saves that; with dryRun the cluster only checks it (--dry-run=server).
 // It returns the object as it was read, and as the cluster answered: as
 // saved, or after a dry run as it would have been saved.
+//
+// If the object changed between the read and the save (a conflict: its
+// controller wrote its status, as it does often while it rolls out), it is
+// read again and edited again, a few times, as kubectl does.
 func update[T any, P copyable[T]](ctx context.Context, client getUpdater[T], name string, dryRun bool, edit func(*T) error) (before, after *T, err error) {
-	before, err = client.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	edited := P(before).DeepCopy() // edit changes a copy, so before stays as it was
-	if err := edit(edited); err != nil {
-		return nil, nil, err
-	}
-	after, err = client.Update(ctx, edited, metav1.UpdateOptions{DryRun: dryRunOption(dryRun)})
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		before, err = client.Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		edited := P(before).DeepCopy() // edit changes a copy, so before stays as it was
+		if err := edit(edited); err != nil {
+			return err
+		}
+		after, err = client.Update(ctx, edited, metav1.UpdateOptions{DryRun: dryRunOption(dryRun)})
+		return err
+	})
 	if err != nil {
 		return nil, nil, err
 	}
