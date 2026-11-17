@@ -195,6 +195,7 @@ plus their own:
 | clusterrolebindings | `More › clusterrolebinding` | `+ create`: `admins clusterrole:cluster-admin user:alice` |
 | endpoints | `More › ep` | only the generic actions; replaced by EndpointSlices since v1.33 |
 | endpointslices | `More › endpointslice` | also read by Services › `p` Endpoints |
+| leases | `More › lease` | only the generic actions |
 
 
 The status column of a row is colored by how things are:

@@ -72,6 +72,7 @@ func Views() []View {
 		clusterRoleBindingsView(),
 		endpointsView(),
 		endpointSlicesView(),
+		leasesView(),
 	}
 }
 
