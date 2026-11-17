@@ -101,6 +101,7 @@ func Views() []View {
 		selfSubjectReviewsView(),
 		selfSubjectAccessReviewsView(),
 		selfSubjectRulesReviewsView(),
+		subjectAccessReviewsView(),
 	}
 }
 

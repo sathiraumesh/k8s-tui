@@ -132,3 +132,55 @@ func (c *Client) MyRules(ctx context.Context, namespace string) (string, error) 
 	}
 	return text, nil
 }
+
+// subjectOf reads who a review asks about: "user:NAME", "group:NAME" or
+// "serviceaccount:NAMESPACE:NAME" (see parseSubject), as the user and
+// groups the API server sees: a service account is the user
+// system:serviceaccount:NAMESPACE:NAME, in its groups.
+func subjectOf(who string) (user string, groups []string, err error) {
+	s, err := parseSubject(who)
+	if err != nil {
+		return "", nil, err
+	}
+	switch s.Kind {
+	case "Group":
+		return "", []string{s.Name}, nil
+	case "ServiceAccount":
+		return "system:serviceaccount:" + s.Namespace + ":" + s.Name,
+			[]string{"system:serviceaccounts", "system:serviceaccounts:" + s.Namespace, "system:authenticated"}, nil
+	}
+	return s.Name, nil, nil
+}
+
+// CanThey asks whether who (see subjectOf) may do verb to resource in
+// namespace, like `kubectl auth can-i VERB RESOURCE --as=USER -n
+// NAMESPACE` but without impersonating: with a SubjectAccessReview, or a
+// LocalSubjectAccessReview if local (asked in the namespace, so the
+// namespace's own admins may ask it).
+func (c *Client) CanThey(ctx context.Context, who, verb, resource, namespace string, local bool) (string, error) {
+	user, groups, err := subjectOf(who)
+	if err != nil {
+		return "", err
+	}
+	attrs, err := c.accessAttributes(ctx, verb, resource, namespace)
+	if err != nil {
+		return "", err
+	}
+	spec := authorizationv1.SubjectAccessReviewSpec{ResourceAttributes: attrs, User: user, Groups: groups}
+	var status authorizationv1.SubjectAccessReviewStatus
+	if local {
+		review := &authorizationv1.LocalSubjectAccessReview{ObjectMeta: metav1.ObjectMeta{Namespace: namespace}, Spec: spec}
+		answer, err := c.clientset.AuthorizationV1().LocalSubjectAccessReviews(namespace).Create(ctx, review, metav1.CreateOptions{})
+		if err != nil {
+			return "", err
+		}
+		status = answer.Status
+	} else {
+		answer, err := c.clientset.AuthorizationV1().SubjectAccessReviews().Create(ctx, &authorizationv1.SubjectAccessReview{Spec: spec}, metav1.CreateOptions{})
+		if err != nil {
+			return "", err
+		}
+		status = answer.Status
+	}
+	return answerText(status), nil
+}

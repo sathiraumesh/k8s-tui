@@ -68,3 +68,20 @@ func TestMyRules(t *testing.T) {
 		t.Errorf("text =\n%s\nwant\n%s", text, want)
 	}
 }
+
+func TestCanThey(t *testing.T) {
+	var asked authorizationv1.SubjectAccessReviewSpec
+	cs := answering("subjectaccessreviews", func(obj runtime.Object) runtime.Object {
+		r := obj.(*authorizationv1.SubjectAccessReview)
+		asked = r.Spec
+		return r // not allowed
+	})
+	cs.Resources = rbacCluster().Resources
+	text, err := NewClientFromClientset(cs).CanThey(context.Background(), "serviceaccount:apps:ci", "create", "deployments", "apps", false)
+	if err != nil || text != "no" || asked.User != "system:serviceaccount:apps:ci" || asked.ResourceAttributes.Group != "apps" {
+		t.Errorf("text = %q, asked = %+v, err = %v", text, asked, err)
+	}
+	if _, err := NewClientFromClientset(cs).CanThey(context.Background(), "alice", "get", "pods", "", false); err == nil {
+		t.Error("who without a kind: err = nil")
+	}
+}
