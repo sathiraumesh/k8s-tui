@@ -76,6 +76,7 @@ func Views() []View {
 		controllerRevisionsView(),
 		podTemplatesView(),
 		replicationControllersView(),
+		componentStatusesView(),
 	}
 }
 

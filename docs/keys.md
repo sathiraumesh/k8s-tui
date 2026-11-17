@@ -199,6 +199,7 @@ plus their own:
 | controllerrevisions | `More › controllerrevision` | only the generic actions (rollout history reads them) |
 | podtemplates | `More › podtemplate` | only the generic actions |
 | replicationcontrollers | `More › rc` | `c` Scale |
+| componentstatuses | `More › cs` | STATUS colored (Healthy green, Unhealthy red); deprecated, read-only |
 
 
 The status column of a row is colored by how things are:
