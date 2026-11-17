@@ -78,6 +78,7 @@ func Views() []View {
 		replicationControllersView(),
 		componentStatusesView(),
 		apiServicesView(),
+		runtimeClassesView(),
 	}
 }
 
