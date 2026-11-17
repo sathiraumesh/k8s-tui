@@ -178,6 +178,7 @@ plus their own:
 | daemonsets | `More › ds` | `t` Restart (node by node), `i` Set image; no Scale: there is one pod per node |
 | replicasets | `More › rs` | `c` Scale (a deployment that owns it sets it back) |
 | jobs | `More › job` | STATUS colored (Complete green, Running/Suspended yellow, Failed red); `o` Logs of its pods; `p` Suspend, `u` Resume; `+ create`: `hello busybox echo hi` |
+| cronjobs | `More › cj` | `n` Run now (a job from it, like `kubectl create job --from=cronjob/NAME`); `p` Suspend, `u` Resume; `+ create`: `backup busybox */5 * * * * echo hi` or `@hourly` |
 
 
 The status column of a row is colored by how things are:

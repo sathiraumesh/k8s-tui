@@ -54,6 +54,7 @@ func Views() []View {
 		daemonSetsView(),
 		replicaSetsView(),
 		jobsView(),
+		cronJobsView(),
 	}
 }
 
