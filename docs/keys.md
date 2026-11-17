@@ -229,6 +229,7 @@ plus their own:
 | servicecidrs | `More › servicecidr` | only the generic actions |
 | volumeattributesclasses | `More › vac` | only the generic actions |
 | deviceclasses | `More › deviceclass` | only the generic actions |
+| devicetaintrules | `More › devicetaint` | only the generic actions |
 
 
 The status column of a row is colored by how things are:

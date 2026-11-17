@@ -111,6 +111,7 @@ func Views() []View {
 		serviceCIDRsView(),
 		volumeAttributesClassesView(),
 		deviceClassesView(),
+		deviceTaintRulesView(),
 	}
 }
 
