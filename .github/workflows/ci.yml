@@ -1,7 +1,8 @@
 # Tests every push and pull request, and builds k8s-tui for Linux, macOS
 # and Windows on amd64 (x86-64) and arm64. Publishing a release on GitHub
 # (Releases › Draft a new release › Publish release) builds them from its
-# tag and attaches them to it, with their checksums.
+# tag and attaches the compiled binaries to it, ready to download and run,
+# with their checksums (SHA256SUMS).
 
 name: CI
 
@@ -57,22 +58,15 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           version="${RELEASE_TAG:-$(git describe --tags --always --dirty)}"
-          name="k8s-tui_${version}_${GOOS}_${GOARCH}"
-          exe=k8s-tui
-          [ "$GOOS" = windows ] && exe=k8s-tui.exe
-          mkdir -p "dist/$name"
-          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "dist/$name/$exe" .
-          cp README.md "dist/$name/"
-          cd dist
-          if [ "$GOOS" = windows ]; then
-            zip -qr "$name.zip" "$name"
-          else
-            tar -czf "$name.tar.gz" "$name"
-          fi
-          rm -r "$name"
+          # The binary itself, ready to run: k8s-tui_v1.2.3_linux_arm64,
+          # k8s-tui_v1.2.3_windows_amd64.exe.
+          bin="k8s-tui_${version}_${GOOS}_${GOARCH}"
+          [ "$GOOS" = windows ] && bin="$bin.exe"
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X main.version=${version}" -o "dist/$bin" .
       - name: Check it runs
         if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
-        run: tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP" && "$RUNNER_TEMP"/k8s-tui_*/k8s-tui --version
+        run: dist/k8s-tui_*_linux_amd64 --version
       - uses: actions/upload-artifact@v4
         with:
           name: k8s-tui-${{ matrix.goos }}-${{ matrix.goarch }}
