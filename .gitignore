@@ -16,3 +16,6 @@ coverage.*
 
 # Local environment
 .env
+
+# Personal kubectl reference (not part of the app)
+/kubectl-reference/
