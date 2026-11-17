@@ -85,3 +85,17 @@ func TestCanThey(t *testing.T) {
 		t.Error("who without a kind: err = nil")
 	}
 }
+
+func TestCanTheyLocal(t *testing.T) {
+	var in string
+	cs := answering("localsubjectaccessreviews", func(obj runtime.Object) runtime.Object {
+		r := obj.(*authorizationv1.LocalSubjectAccessReview)
+		in = r.Namespace
+		r.Status.Allowed = true
+		return r
+	})
+	cs.Resources = rbacCluster().Resources
+	if text, err := NewClientFromClientset(cs).CanThey(context.Background(), "user:alice", "get", "pods", "apps", true); err != nil || text != "yes" || in != "apps" {
+		t.Errorf("text = %q, in %q, err = %v", text, in, err)
+	}
+}

@@ -220,6 +220,7 @@ plus their own:
 | selfsubjectaccessreviews | `More › can-i` | `+` Can I: `create deployments apps` (verb, resource, namespace), like `kubectl auth can-i` |
 | selfsubjectrulesreviews | `More › my-rules` | `+` My rules: what you may do in a namespace, like `kubectl auth can-i --list` |
 | subjectaccessreviews | `More › can-they` | `+` Can they: `user:alice create deployments apps` (or `group:`, `serviceaccount:NS:NAME`), like `kubectl auth can-i --as` |
+| localsubjectaccessreviews | `More › can-they-here` | `+` Can they, in the namespace picked: `serviceaccount:apps:ci create deployments` |
 
 
 The status column of a row is colored by how things are:
