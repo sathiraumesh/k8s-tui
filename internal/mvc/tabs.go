@@ -62,6 +62,11 @@ type tab struct {
 	ownTitle  string
 	ownTarget string
 
+	// opens, if set, is the tab a row is shown in, for a tab whose rows are
+	// kinds of things (More): enter on "pods" goes to Pods. what is the
+	// row's name, for saying when there is no such tab.
+	opens func(row string) (tab, what string, ok bool)
+
 	// status is the column of the rows colored by how things are (green,
 	// yellow, red), e.g. a pod's STATUS. nil for none.
 	status *commands.StatusColumn
@@ -137,6 +142,7 @@ func allTabs() []tab {
 		{
 			name:        tabMore,
 			load:        commands.LoadResources,
+			opens:       commands.ResourceTab,
 			command:     "kubectl api-resources",
 			autoRefresh: false,
 		},

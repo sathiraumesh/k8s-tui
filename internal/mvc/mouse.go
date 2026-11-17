@@ -12,6 +12,7 @@ import (
 //	left click   a tab                 switches to it
 //	             a button              presses it (wide, refresh, ns, + run, search)
 //	             a row of the list     selects it; clicking it again opens its actions
+//	                                   (on More, the tab of that kind, e.g. Pods)
 //	             an action             picks it
 //	             a namespace/container picks it
 //	             the text field        puts the cursor there to type
@@ -190,8 +191,8 @@ func (m Model) clickRow(i int) (tea.Model, tea.Cmd) {
 	switch m.overlay {
 	case overlayNone:
 		// The selected row clicked again opens its actions, like enter.
-		if m.focus == focusList && m.cursor == i && m.canOpenActions() {
-			return m.openActions(), nil
+		if m.focus == focusList && m.cursor == i && m.canOpenRow() {
+			return m.openRow() // its actions, or on More its tab
 		}
 		m.focus = focusList
 		m.cursor = i

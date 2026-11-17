@@ -52,3 +52,42 @@ func resourceRows(resources []k8s.Resource, wide bool) []string {
 	}
 	return AlignColumns(cells)
 }
+
+// ResourceOf reads a row of the More tab: the resource's name, API version
+// and kind. The row is
+//
+//	NAME  [SHORTNAMES]  APIVERSION  NAMESPACED  KIND  [VERBS  CATEGORIES]
+//
+// where the short names may be missing, so the columns are found from
+// NAMESPACED, the first one that is "true" or "false".
+func ResourceOf(row string) (name, apiVersion, kind string, ok bool) {
+	f := strings.Fields(row)
+	for i := 2; i+1 < len(f); i++ {
+		if f[i] == "true" || f[i] == "false" {
+			return f[0], f[i-1], f[i+1], true
+		}
+	}
+	return "", "", "", false
+}
+
+// resourceTabs are the tabs that show a kind of resource, by its API
+// version and kind: "v1 Pod" is the Pods tab. Matching both, and not the
+// name, keeps another API's "pods" (metrics.k8s.io) out.
+var resourceTabs = map[string]string{
+	"v1 Node":            TabNodes,
+	"v1 Pod":             TabPods,
+	"apps/v1 Deployment": TabDeployments,
+	"v1 Service":         TabServices,
+}
+
+// ResourceTab is the tab that shows the resource of a More row, e.g.
+// Pods for "pods  po  v1  true  Pod", and the resource's name. ok is false
+// if no tab shows it (yet); name is still set if the row could be read.
+func ResourceTab(row string) (tab, name string, ok bool) {
+	name, apiVersion, kind, read := ResourceOf(row)
+	if !read {
+		return "", RowName(row), false
+	}
+	tab, ok = resourceTabs[apiVersion+" "+kind]
+	return tab, name, ok
+}

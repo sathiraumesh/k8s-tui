@@ -100,6 +100,15 @@ LoadBalancer) from a name and ports, e.g. `web 80:8080`, for the pods
 labelled `app=web`. Anything that changes the cluster asks first (`y`
 runs it) and has a `--dry-run=server` tick box.
 
+### On More
+
+More lists every kind of resource the cluster serves. `enter` (or a
+second click) on one that has a tab of its own goes to that tab:
+`pods` → Pods, `deployments` → Deployments, `services` → Services,
+`nodes` → Nodes, with the cursor on its list. A kind matches by its API
+version and kind, so `pods` of `metrics.k8s.io` doesn't go to Pods. A kind
+without a tab says so on the line under the panel.
+
 ## Status colors
 
 The status column of a row is colored by how things are:

@@ -202,6 +202,9 @@ func (m Model) helpText() string {
 	if len(m.actions()) > 0 {
 		help += " • enter actions"
 	}
+	if m.activeTab().opens != nil {
+		help += " • enter open its tab"
+	}
 	if t := m.activeTab(); len(t.own) > 0 {
 		help += " • " + t.ownButton // e.g. "+ run": its key, then what it does
 	}

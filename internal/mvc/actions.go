@@ -76,6 +76,45 @@ func (m Model) canOpenActions() bool {
 	return len(m.actions()) > 0 && loaded && m.err == nil && len(m.rows()) > 0
 }
 
+// canOpenRow reports whether enter on the list does something with the
+// row: opens its actions, or the tab it is shown in (tab.opens, on More).
+func (m Model) canOpenRow() bool {
+	if m.activeTab().opens == nil {
+		return m.canOpenActions()
+	}
+	_, loaded := m.updated[m.activeName()]
+	return loaded && m.err == nil && len(m.rows()) > 0
+}
+
+// openRow is enter on the list's row: its actions, or on More the tab
+// that shows that kind of thing.
+func (m Model) openRow() (Model, tea.Cmd) {
+	if m.activeTab().opens != nil {
+		return m.openRowTab()
+	}
+	return m.openActions(), nil
+}
+
+// openRowTab goes to the tab that shows the kind of thing the row is, e.g.
+// Pods from "pods" on More, with the cursor on its list. A kind without a
+// tab says so on the line under the panel.
+func (m Model) openRowTab() (Model, tea.Cmd) {
+	tab, what, ok := m.activeTab().opens(m.rows()[m.cursor])
+	if !ok {
+		m.notice = what + " has no tab of its own yet"
+		return m, nil
+	}
+	for i, t := range m.tabs {
+		if t.name == tab {
+			next, cmd := m.switchTab(i - m.active)
+			m = next.(Model)
+			m.focus = focusList
+			return m, cmd
+		}
+	}
+	return m, nil
+}
+
 // openActions opens the action list for the row the cursor is on.
 func (m Model) openActions() Model {
 	m.target = m.rowTarget(m.rows()[m.cursor])

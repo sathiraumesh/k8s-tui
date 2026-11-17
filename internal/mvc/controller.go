@@ -147,8 +147,8 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.focus == focusButtons {
 			return m.pressButton()
 		}
-		if msg.String() == KeyEnter && m.focus == focusList && m.canOpenActions() {
-			return m.openActions(), nil
+		if msg.String() == KeyEnter && m.focus == focusList && m.canOpenRow() {
+			return m.openRow() // its actions, or on More its tab
 		}
 
 	// → : next button on the buttons, otherwise next tab.
