@@ -99,3 +99,23 @@ func TestCanTheyLocal(t *testing.T) {
 		t.Errorf("text = %q, in %q, err = %v", text, in, err)
 	}
 }
+
+func TestCheckToken(t *testing.T) {
+	cs := answering("tokenreviews", func(obj runtime.Object) runtime.Object {
+		r := obj.(*authenticationv1.TokenReview)
+		if r.Spec.Token == "good" {
+			r.Status = authenticationv1.TokenReviewStatus{Authenticated: true, User: authenticationv1.UserInfo{Username: "system:serviceaccount:apps:ci"}}
+		}
+		return r
+	})
+	c := NewClientFromClientset(cs)
+	if text, _ := c.CheckToken(context.Background(), " good "); !strings.HasPrefix(text, "Authenticated") || !strings.Contains(text, "apps:ci") {
+		t.Errorf("good: %q", text)
+	}
+	if text, _ := c.CheckToken(context.Background(), "bad"); !strings.HasPrefix(text, "Not authenticated") {
+		t.Errorf("bad: %q", text)
+	}
+	if _, err := c.CheckToken(context.Background(), ""); err == nil {
+		t.Error("no token: err = nil")
+	}
+}

@@ -184,3 +184,27 @@ func (c *Client) CanThey(ctx context.Context, who, verb, resource, namespace str
 	}
 	return answerText(status), nil
 }
+
+// CheckToken asks the API server whether it accepts token, and as whom: a
+// TokenReview, which kubectl has no command for. It is how a webhook or
+// another server checks a token it was given.
+func (c *Client) CheckToken(ctx context.Context, token string) (string, error) {
+	if strings.TrimSpace(token) == "" {
+		return "", fmt.Errorf("paste a token, e.g. one from More › sa › Token")
+	}
+	review := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: strings.TrimSpace(token)}}
+	answer, err := c.clientset.AuthenticationV1().TokenReviews().Create(ctx, review, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	if !answer.Status.Authenticated {
+		why := answer.Status.Error
+		if why == "" {
+			why = "the API server doesn't accept it"
+		}
+		return "Not authenticated: " + why, nil
+	}
+	groups := append([]string{}, answer.Status.User.Groups...)
+	sort.Strings(groups)
+	return "Authenticated\n\n" + userText(answer.Status.User.Username, groups), nil
+}
