@@ -211,6 +211,7 @@ plus their own:
 | validatingwebhookconfigurations | `More › validatingwebhook` | only the generic actions |
 | mutatingwebhookconfigurations | `More › mutatingwebhook` | only the generic actions |
 | validatingadmissionpolicies | `More › validatingpolicy` | only the generic actions |
+| validatingadmissionpolicybindings | `More › validatingpolicybinding` | only the generic actions |
 
 
 The status column of a row is colored by how things are:
