@@ -128,10 +128,7 @@ func (c *Client) Uncordon(ctx context.Context, name string, dryRun bool) error {
 // cordon and uncordon change.
 func (c *Client) setUnschedulable(ctx context.Context, name string, unschedulable, dryRun bool) error {
 	patch := fmt.Appendf(nil, `{"spec":{"unschedulable":%t}}`, unschedulable)
-	opts := metav1.PatchOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
+	opts := metav1.PatchOptions{DryRun: dryRunOption(dryRun)}
 	_, err := c.clientset.CoreV1().Nodes().Patch(ctx, name, types.StrategicMergePatchType, patch, opts)
 	return err
 }

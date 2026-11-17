@@ -216,11 +216,7 @@ func (c *Client) LabelService(ctx context.Context, namespace, name string, chang
 // DeleteService deletes the service, like `kubectl delete service NAME -n
 // NAMESPACE`. Its pods keep running; only the way to reach them goes.
 func (c *Client) DeleteService(ctx context.Context, namespace, name string, dryRun bool) error {
-	opts := metav1.DeleteOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	return c.clientset.CoreV1().Services(namespace).Delete(ctx, name, opts)
+	return deleteObject(ctx, c.clientset.CoreV1().Services(namespace), name, dryRun)
 }
 
 // parsePorts reads ports as kubectl's --tcp takes them: "PORT" or
@@ -307,10 +303,6 @@ func (c *Client) createService(ctx context.Context, namespace, name string, serv
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace, Labels: map[string]string{"app": name}},
 		Spec:       corev1.ServiceSpec{Type: serviceType, Selector: selector, Ports: ports},
 	}
-	opts := metav1.CreateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	_, err := c.clientset.CoreV1().Services(namespace).Create(ctx, s, opts)
+	_, err := c.clientset.CoreV1().Services(namespace).Create(ctx, s, metav1.CreateOptions{DryRun: dryRunOption(dryRun)})
 	return err
 }

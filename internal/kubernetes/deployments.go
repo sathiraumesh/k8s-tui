@@ -124,11 +124,7 @@ func (c *Client) DeploymentContainers(ctx context.Context, namespace, name strin
 // DeploymentLabelsAndAnnotations returns the deployment's labels and
 // annotations, as key=value sorted by key.
 func (c *Client) DeploymentLabelsAndAnnotations(ctx context.Context, namespace, name string) (labels, annotations []string, err error) {
-	d, err := c.clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	return pairs(d.Labels), pairs(d.Annotations), nil
+	return labelsAndAnnotations[appsv1.Deployment](ctx, c.clientset.AppsV1().Deployments(namespace), name)
 }
 
 // LabelDeployment sets and removes labels on the deployment, like
@@ -191,11 +187,7 @@ func (c *Client) RestartDeployment(ctx context.Context, namespace, name string, 
 // NAME -n NAMESPACE`. Its replica sets and pods are deleted after it, in the
 // background.
 func (c *Client) DeleteDeployment(ctx context.Context, namespace, name string, dryRun bool) error {
-	opts := metav1.DeleteOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	return c.clientset.AppsV1().Deployments(namespace).Delete(ctx, name, opts)
+	return deleteObject(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun)
 }
 
 // CreateDeployment makes a deployment called name in namespace, running
@@ -222,11 +214,7 @@ func (c *Client) CreateDeployment(ctx context.Context, namespace, name, image st
 			},
 		},
 	}
-	opts := metav1.CreateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	_, err := c.clientset.AppsV1().Deployments(namespace).Create(ctx, d, opts)
+	_, err := c.clientset.AppsV1().Deployments(namespace).Create(ctx, d, metav1.CreateOptions{DryRun: dryRunOption(dryRun)})
 	return err
 }
 

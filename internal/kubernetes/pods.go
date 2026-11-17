@@ -247,11 +247,7 @@ func (c *Client) RunPod(ctx context.Context, namespace, name, image string, dryR
 			Containers: []corev1.Container{{Name: name, Image: image}},
 		},
 	}
-	opts := metav1.CreateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	_, err := c.clientset.CoreV1().Pods(namespace).Create(ctx, pod, opts)
+	_, err := c.clientset.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{DryRun: dryRunOption(dryRun)})
 	return err
 }
 
@@ -364,11 +360,7 @@ func (c *Client) PodContainers(ctx context.Context, namespace, name string, runn
 // LabelsAndAnnotations returns the pod's labels and annotations, as
 // key=value sorted by key.
 func (c *Client) LabelsAndAnnotations(ctx context.Context, namespace, name string) (labels, annotations []string, err error) {
-	p, err := c.clientset.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	return pairs(p.Labels), pairs(p.Annotations), nil
+	return labelsAndAnnotations[corev1.Pod](ctx, c.clientset.CoreV1().Pods(namespace), name)
 }
 
 // LabelPod sets and removes labels on the pod, like
@@ -385,13 +377,10 @@ func (c *Client) LabelPod(ctx context.Context, namespace, name string, changes [
 //
 // With dryRun the cluster checks it but deletes nothing.
 func (c *Client) DeletePod(ctx context.Context, namespace, name string, now, dryRun bool) error {
-	opts := metav1.DeleteOptions{}
+	opts := metav1.DeleteOptions{DryRun: dryRunOption(dryRun)}
 	if now {
 		grace := int64(1)
 		opts.GracePeriodSeconds = &grace
-	}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
 	}
 	return c.clientset.CoreV1().Pods(namespace).Delete(ctx, name, opts)
 }

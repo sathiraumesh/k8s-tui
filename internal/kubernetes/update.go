@@ -38,11 +38,7 @@ func update[T any, P copyable[T]](ctx context.Context, client getUpdater[T], nam
 	if err := edit(edited); err != nil {
 		return nil, nil, err
 	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err = client.Update(ctx, edited, opts)
+	after, err = client.Update(ctx, edited, metav1.UpdateOptions{DryRun: dryRunOption(dryRun)})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -76,4 +72,46 @@ func labelObject[T any, P labeled[T]](ctx context.Context, client getUpdater[T],
 		return Change{}, err
 	}
 	return Change{Before: pairs(P(before).GetLabels()), After: pairs(P(after).GetLabels())}, nil
+}
+
+// getter is what labelsAndAnnotations needs of a typed client.
+type getter[T any] interface {
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*T, error)
+}
+
+// annotated is a pointer to an API object with labels and annotations.
+type annotated[T any] interface {
+	*T
+	GetLabels() map[string]string
+	GetAnnotations() map[string]string
+}
+
+// labelsAndAnnotations returns the labels and annotations of the object
+// called name, as key=value sorted by key: what Show shows.
+func labelsAndAnnotations[T any, P annotated[T]](ctx context.Context, client getter[T], name string) (labels, annotations []string, err error) {
+	obj, err := client.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	return pairs(P(obj).GetLabels()), pairs(P(obj).GetAnnotations()), nil
+}
+
+// deleter is what deleteObject needs of a typed client.
+type deleter interface {
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+}
+
+// deleteObject deletes the object called name, like `kubectl delete KIND
+// NAME`; with dryRun the cluster only checks it.
+func deleteObject(ctx context.Context, client deleter, name string, dryRun bool) error {
+	return client.Delete(ctx, name, metav1.DeleteOptions{DryRun: dryRunOption(dryRun)})
+}
+
+// dryRunOption is the DryRun of create, update and delete options:
+// --dry-run=server with dryRun, else none.
+func dryRunOption(dryRun bool) []string {
+	if dryRun {
+		return []string{metav1.DryRunAll}
+	}
+	return nil
 }

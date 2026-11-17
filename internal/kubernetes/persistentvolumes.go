@@ -108,11 +108,7 @@ func (c *Client) DescribePersistentVolume(_ context.Context, name string, showEv
 // PersistentVolumeLabelsAndAnnotations returns the volume's labels and
 // annotations, as key=value sorted by key.
 func (c *Client) PersistentVolumeLabelsAndAnnotations(ctx context.Context, name string) (labels, annotations []string, err error) {
-	pv, err := c.clientset.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	return pairs(pv.Labels), pairs(pv.Annotations), nil
+	return labelsAndAnnotations[corev1.PersistentVolume](ctx, c.clientset.CoreV1().PersistentVolumes(), name)
 }
 
 // LabelPersistentVolume sets and removes labels on the volume, like
@@ -171,11 +167,7 @@ func (c *Client) MakeAvailable(ctx context.Context, name string, dryRun bool) er
 // Terminating until the claim is deleted (the kubernetes.io/pv-protection
 // finalizer).
 func (c *Client) DeletePersistentVolume(ctx context.Context, name string, dryRun bool) error {
-	opts := metav1.DeleteOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	return c.clientset.CoreV1().PersistentVolumes().Delete(ctx, name, opts)
+	return deleteObject(ctx, c.clientset.CoreV1().PersistentVolumes(), name, dryRun)
 }
 
 // CreateHostPathVolume makes a persistent volume of size, ReadWriteOnce,
@@ -215,10 +207,6 @@ func (c *Client) CreateHostPathVolume(ctx context.Context, name, size, dir strin
 			},
 		},
 	}
-	opts := metav1.CreateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	_, err = c.clientset.CoreV1().PersistentVolumes().Create(ctx, pv, opts)
+	_, err = c.clientset.CoreV1().PersistentVolumes().Create(ctx, pv, metav1.CreateOptions{DryRun: dryRunOption(dryRun)})
 	return err
 }
