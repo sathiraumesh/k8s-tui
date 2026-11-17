@@ -70,3 +70,26 @@ func TestViewKeysUsable(t *testing.T) {
 		}
 	}
 }
+
+// Every view opens from its row in More: the row of api-resources for its
+// kind leads to it.
+func TestViewsOpenFromMore(t *testing.T) {
+	names := map[string]bool{}
+	for _, v := range Views() {
+		if names[v.Name()] {
+			t.Errorf("two views are called %s", v.Name())
+		}
+		names[v.Name()] = true
+		namespaced := "false"
+		if v.Type.Namespaced {
+			namespaced = "true"
+		}
+		row := strings.Join([]string{v.Type.Resource, v.Type.APIVersion(), namespaced, v.Type.Kind}, "   ")
+		if tab, _, ok := ResourceTab(row); !ok || tab != v.Name() {
+			t.Errorf("%q opens %q, %v, want %s", row, tab, ok, v.Name())
+		}
+		if v.Title == "" {
+			t.Errorf("%s has no title for the tab bar", v.Name())
+		}
+	}
+}

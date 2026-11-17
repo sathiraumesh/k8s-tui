@@ -55,6 +55,7 @@ func Views() []View {
 		replicaSetsView(),
 		jobsView(),
 		cronJobsView(),
+		ingressesView(),
 	}
 }
 
