@@ -89,6 +89,7 @@ func Views() []View {
 		mutatingWebhookConfigurationsView(),
 		validatingAdmissionPoliciesView(),
 		validatingAdmissionPolicyBindingsView(),
+		mutatingAdmissionPoliciesView(),
 	}
 }
 
