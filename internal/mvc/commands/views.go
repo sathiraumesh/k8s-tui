@@ -80,6 +80,7 @@ func Views() []View {
 		apiServicesView(),
 		runtimeClassesView(),
 		csiDriversView(),
+		csiNodesView(),
 	}
 }
 

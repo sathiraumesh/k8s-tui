@@ -203,6 +203,7 @@ plus their own:
 | apiservices | `More › apiservice` | AVAILABLE colored (True green, False red: its server doesn't answer) |
 | runtimeclasses | `More › runtimeclass` | only the generic actions |
 | csidrivers | `More › csidriver` | only the generic actions |
+| csinodes | `More › csinode` | only the generic actions; written by the kubelet |
 
 
 The status column of a row is colored by how things are:
