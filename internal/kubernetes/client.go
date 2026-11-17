@@ -1,8 +1,6 @@
 package kubernetes
 
 import (
-	"context"
-
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -24,20 +22,38 @@ type Client struct {
 	dynamic dynamic.Interface
 
 	// config holds the connection settings the client was made from. Some
-	// of kubectl's describers can only be made from these. It is nil for a
+	// of kubectl's describers can only be made from these, and the lists
+	// of the generic views are read with them (generic.go). It is nil for a
 	// pretend cluster in tests.
 	config *rest.Config
-
-	// rawGet fetches a path of the cluster's API as it is, for the parts of
-	// the API the clientset has no typed access to (the metrics). It is nil
-	// when there is no such access, as with a pretend cluster in tests.
-	rawGet func(ctx context.Context, path string) ([]byte, error)
 }
 
 // NewClientFromClientset wraps an existing clientset, such as the fake one
 // from k8s.io/client-go/kubernetes/fake, so tests can use a pretend cluster.
 func NewClientFromClientset(cs kubernetes.Interface) *Client {
 	return &Client{clientset: cs}
+}
+
+// NewClientFromClientsets is NewClientFromClientset with a dynamic client
+// too, such as the fake one from k8s.io/client-go/dynamic/fake, for tests
+// of the generic views (generic.go).
+func NewClientFromClientsets(cs kubernetes.Interface, dyn dynamic.Interface) *Client {
+	return &Client{clientset: cs, dynamic: dyn}
+}
+
+// NewClientFromConfig connects with the connection settings config, as
+// NewClient does once it has read them. kubeContext is the kubeconfig
+// context they are from, "" for none (tests against a pretend server).
+func NewClientFromConfig(config *rest.Config, kubeContext string) (*Client, error) {
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	dyn, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{clientset: clientset, dynamic: dyn, config: config, context: kubeContext}, nil
 }
 
 // NewClient connects using your kubeconfig (~/.kube/config, or $KUBECONFIG),
@@ -56,21 +72,7 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	dyn, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Client{
-		clientset: clientset,
-		dynamic:   dyn,
-		config:    config,
-		context:   raw.CurrentContext,
-	}, nil
+	return NewClientFromConfig(config, raw.CurrentContext)
 }
 
 // Context is the name of the kubeconfig context the client talks to, e.g.

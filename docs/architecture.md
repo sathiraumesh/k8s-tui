@@ -21,6 +21,9 @@ internal/
     persistentvolumes.go    PersistentVolume, ListPersistentVolumes, reclaim policy, make available
     persistentvolumeclaims.go  PersistentVolumeClaim, its pods, resize, create
     update.go               what every kind shares: update, labelObject, deleteObject
+    generic.go              the calls every kind has, for any kind: ListTable (the
+                            server's own kubectl get columns), Describe, YAML, label,
+                            delete, edit
     terminal.go             the kubectl commands that need the terminal: shells, editors
   mvc/                      the UI: state, key handling and drawing
     tabs.go                 allTabs: every tab, its loader and whether it auto refreshes
@@ -41,6 +44,8 @@ internal/
       services.go           LoadServices, ServiceActions, CreateServiceActions
       persistentvolumes.go  LoadPersistentVolumes, PersistentVolumeActions (a view of More)
       persistentvolumeclaims.go  LoadPersistentVolumeClaims, PersistentVolumeClaimActions (a view of More)
+      views.go              View: a kind opened in More with the generic calls; Views
+                            lists them, one file per kind
       resources.go          LoadResources (More tab)
       status.go             how a status column reads: green, yellow or red
     refresh.go              the auto refresh timer and rates (logic only)

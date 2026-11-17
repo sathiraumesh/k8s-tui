@@ -20,7 +20,7 @@ import (
 // kindTabs are the views More can open, each a tab of its own that isn't in
 // the tab bar. title is how the tab bar shows it after "More › ".
 func kindTabs() []tab {
-	return []tab{
+	tabs := []tab{
 		{
 			name:        commands.TabPersistentVolumes,
 			title:       "pv",
@@ -50,6 +50,34 @@ func kindTabs() []tab {
 			autoRefresh:   true,
 		},
 	}
+	for _, v := range commands.Views() {
+		tabs = append(tabs, viewTab(v))
+	}
+	return tabs
+}
+
+// viewTab is the tab of a generic view (commands.View): a kind listed and
+// acted on with the calls every kind has, and its own.
+func viewTab(v commands.View) tab {
+	t := tab{
+		name:        v.Name(),
+		title:       v.Title,
+		load:        v.Load,
+		command:     v.Command(),
+		namespaced:  v.Type.Namespaced,
+		actions:     v.AllActions(),
+		status:      v.Status,
+		rowTarget:   v.RowTarget,
+		own:         v.Own,
+		ownButton:   v.OwnButton,
+		ownTitle:    v.OwnTitle,
+		autoRefresh: true,
+	}
+	t.commandTarget = v.CommandTarget
+	if v.Type.Namespaced {
+		t.ownTarget = commands.RunNamespace
+	}
+	return t
 }
 
 // kindTab is the view of More called name.

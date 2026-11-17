@@ -92,6 +92,11 @@ func ResourceTab(row string) (tab, name string, ok bool) {
 	if !read {
 		return "", RowName(row), false
 	}
-	tab, ok = resourceTabs[apiVersion+" "+kind]
-	return tab, name, ok
+	if tab, ok = resourceTabs[apiVersion+" "+kind]; ok {
+		return tab, name, true
+	}
+	if v, ok := viewFor(apiVersion, kind); ok {
+		return v.Name(), name, true
+	}
+	return "", name, false
 }
