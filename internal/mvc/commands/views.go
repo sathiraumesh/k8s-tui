@@ -50,6 +50,7 @@ func Views() []View {
 		secretsView(),
 		namespacesView(),
 		serviceAccountsView(),
+		statefulSetsView(),
 	}
 }
 
