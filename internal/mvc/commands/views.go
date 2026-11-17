@@ -90,6 +90,7 @@ func Views() []View {
 		validatingAdmissionPoliciesView(),
 		validatingAdmissionPolicyBindingsView(),
 		mutatingAdmissionPoliciesView(),
+		mutatingAdmissionPolicyBindingsView(),
 	}
 }
 
