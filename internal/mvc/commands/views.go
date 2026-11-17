@@ -87,6 +87,7 @@ func Views() []View {
 		priorityLevelConfigurationsView(),
 		validatingWebhookConfigurationsView(),
 		mutatingWebhookConfigurationsView(),
+		validatingAdmissionPoliciesView(),
 	}
 }
 
