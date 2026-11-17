@@ -106,6 +106,7 @@ func Views() []View {
 		tokenReviewsView(),
 		leaseCandidatesView(),
 		clusterTrustBundlesView(),
+		podCertificateRequestsView(),
 	}
 }
 
