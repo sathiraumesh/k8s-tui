@@ -70,6 +70,7 @@ func Views() []View {
 		clusterRolesView(),
 		roleBindingsView(),
 		clusterRoleBindingsView(),
+		endpointsView(),
 	}
 }
 
