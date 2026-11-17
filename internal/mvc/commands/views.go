@@ -62,6 +62,7 @@ func Views() []View {
 		horizontalPodAutoscalersView(),
 		podDisruptionBudgetsView(),
 		priorityClassesView(),
+		resourceQuotasView(),
 	}
 }
 
