@@ -1,11 +1,13 @@
 package kubernetes
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // What the kinds that run pods from a template share (deployments,
@@ -58,4 +60,43 @@ func templateContainers(spec corev1.PodSpec, running bool) []string {
 		containers = append(containers, ct.Name)
 	}
 	return containers
+}
+
+// templateOf gives the pod template of a T, e.g. a StatefulSet's.
+type templateOf[T any] func(*T) *corev1.PodTemplateSpec
+
+// restartWorkload stamps a restart on the template of the T called name
+// (see stampRestart), so its controller replaces its pods.
+func restartWorkload[T any, P copyable[T]](ctx context.Context, client getUpdater[T], name string, dryRun bool, template templateOf[T]) error {
+	_, _, err := update[T, P](ctx, client, name, dryRun, func(obj *T) error {
+		stampRestart(template(obj))
+		return nil
+	})
+	return err
+}
+
+// setWorkloadImage changes container images in the template of the T
+// called name (see setImages), and returns them before and after.
+func setWorkloadImage[T any, P copyable[T]](ctx context.Context, client getUpdater[T], name string, changes []string, dryRun bool, template templateOf[T]) (Change, error) {
+	images, err := parseImages(changes)
+	if err != nil {
+		return Change{}, err
+	}
+	before, after, err := update[T, P](ctx, client, name, dryRun, func(obj *T) error {
+		return setImages(&template(obj).Spec, images)
+	})
+	if err != nil {
+		return Change{}, err
+	}
+	return Change{Before: imagesOf(template(before).Spec), After: imagesOf(template(after).Spec)}, nil
+}
+
+// workloadContainers are the containers of the template of the T called
+// name (see templateContainers).
+func workloadContainers[T any](ctx context.Context, client getter[T], name string, running bool, template templateOf[T]) ([]string, error) {
+	obj, err := client.Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return templateContainers(template(obj).Spec, running), nil
 }

@@ -175,6 +175,7 @@ plus their own:
 | namespaces | `More › ns` | STATUS colored (Active green, Terminating yellow); `u` Use: makes it the namespace the tabs show; Delete warns it deletes everything in it; `+ create` a namespace |
 | serviceaccounts | `More › sa` | `t` Token: a short-lived token to act as it (`1h`), like `kubectl create token`; right click › Copy row copies it whole; `+ create` a service account |
 | statefulsets | `More › sts` | READY colored; `c` Scale, `t` Restart (one pod at a time, the highest first), `i` Set image; Delete keeps their storage |
+| daemonsets | `More › ds` | `t` Restart (node by node), `i` Set image; no Scale: there is one pod per node |
 
 
 The status column of a row is colored by how things are:

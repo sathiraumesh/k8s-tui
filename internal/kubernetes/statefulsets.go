@@ -4,21 +4,20 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // What statefulsets have of their own; the rest is the generic calls
 // (generic.go). A statefulset runs pods with fixed names (db-0, db-1, …)
 // and each its own storage, started and stopped in order.
 
+// statefulSetTemplate is a statefulset's pod template.
+func statefulSetTemplate(s *appsv1.StatefulSet) *corev1.PodTemplateSpec { return &s.Spec.Template }
+
 // StatefulSetContainers returns the names of the containers in the
 // statefulset's pod template (see templateContainers).
 func (c *Client) StatefulSetContainers(ctx context.Context, namespace, name string, running bool) ([]string, error) {
-	s, err := c.clientset.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return templateContainers(s.Spec.Template.Spec, running), nil
+	return workloadContainers(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, running, statefulSetTemplate)
 }
 
 // ScaleStatefulSet sets how many pods the statefulset runs, like `kubectl
@@ -42,26 +41,12 @@ func (c *Client) ScaleStatefulSet(ctx context.Context, namespace, name, replicas
 // RestartStatefulSet replaces its pods one at a time, the highest first,
 // like `kubectl rollout restart statefulset NAME -n NAMESPACE`.
 func (c *Client) RestartStatefulSet(ctx context.Context, namespace, name string, dryRun bool) error {
-	_, _, err := update(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, dryRun, func(s *appsv1.StatefulSet) error {
-		stampRestart(&s.Spec.Template)
-		return nil
-	})
-	return err
+	return restartWorkload(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, dryRun, statefulSetTemplate)
 }
 
 // SetStatefulSetImage changes container images of the statefulset's pod
 // template, like `kubectl set image statefulset/NAME app=IMAGE`; its pods
 // are then replaced in order.
 func (c *Client) SetStatefulSetImage(ctx context.Context, namespace, name string, changes []string, dryRun bool) (Change, error) {
-	images, err := parseImages(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := update(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, dryRun, func(s *appsv1.StatefulSet) error {
-		return setImages(&s.Spec.Template.Spec, images)
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: imagesOf(before.Spec.Template.Spec), After: imagesOf(after.Spec.Template.Spec)}, nil
+	return setWorkloadImage(ctx, c.clientset.AppsV1().StatefulSets(namespace), name, changes, dryRun, statefulSetTemplate)
 }

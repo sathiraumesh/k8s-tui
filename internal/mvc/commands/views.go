@@ -51,6 +51,7 @@ func Views() []View {
 		namespacesView(),
 		serviceAccountsView(),
 		statefulSetsView(),
+		daemonSetsView(),
 	}
 }
 
