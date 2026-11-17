@@ -234,6 +234,7 @@ plus their own:
 | resourceclaimtemplates | `More › resourceclaimtemplate` | only the generic actions |
 | resourceslices | `More › resourceslice` | only the generic actions; written by drivers |
 | resourcepoolstatusrequests | `More › poolstatus` | only the generic actions (alpha) |
+| podgroups | `More › podgroup` | only the generic actions (beta) |
 
 
 The status column of a row is colored by how things are:
