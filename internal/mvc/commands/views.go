@@ -49,6 +49,7 @@ func Views() []View {
 		configMapsView(),
 		secretsView(),
 		namespacesView(),
+		serviceAccountsView(),
 	}
 }
 

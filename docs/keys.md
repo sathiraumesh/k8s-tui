@@ -173,6 +173,7 @@ plus their own:
 | configmaps | `More › cm` | `a` Data: each key and value; `+ create` from entries: `app-config mode=fast level=3` |
 | secrets | `More › secret` | `a` Decode: each value decoded from base64; `+ create` generic from entries (`db-login user=admin password=s3cret`) or docker-registry (`regcred ghcr.io me PASSWORD`) |
 | namespaces | `More › ns` | STATUS colored (Active green, Terminating yellow); `u` Use: makes it the namespace the tabs show; Delete warns it deletes everything in it; `+ create` a namespace |
+| serviceaccounts | `More › sa` | `t` Token: a short-lived token to act as it (`1h`), like `kubectl create token`; right click › Copy row copies it whole; `+ create` a service account |
 
 
 The status column of a row is colored by how things are:
