@@ -236,6 +236,7 @@ plus their own:
 | resourcepoolstatusrequests | `More › poolstatus` | only the generic actions (alpha) |
 | podgroups | `More › podgroup` | only the generic actions (beta) |
 | workloads | `More › workload` | only the generic actions (beta) |
+| compositepodgroups | `More › compositepodgroup` | only the generic actions (alpha) |
 
 
 The status column of a row is colored by how things are:
