@@ -95,3 +95,40 @@ func (c *Client) CanI(ctx context.Context, verb, resource, namespace string) (st
 	}
 	return answerText(answer.Status), nil
 }
+
+// MyRules lists what the client may do in namespace, like `kubectl auth
+// can-i --list -n NAMESPACE`: a line per rule, its resources then its
+// verbs, lined up. The server may not know them all (incomplete, e.g. with
+// a webhook authorizer); it says so on the last line.
+func (c *Client) MyRules(ctx context.Context, namespace string) (string, error) {
+	if namespace == "" {
+		namespace = "default"
+	}
+	review := &authorizationv1.SelfSubjectRulesReview{Spec: authorizationv1.SelfSubjectRulesReviewSpec{Namespace: namespace}}
+	answer, err := c.clientset.AuthorizationV1().SelfSubjectRulesReviews().Create(ctx, review, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	rows := [][]string{{"RESOURCES", "NAMES", "VERBS"}}
+	for _, r := range answer.Status.ResourceRules {
+		var resources []string
+		for _, g := range r.APIGroups {
+			for _, res := range r.Resources {
+				if g != "" && g != "*" {
+					res += "." + g
+				}
+				resources = append(resources, res)
+			}
+		}
+		names := "[" + strings.Join(r.ResourceNames, " ") + "]"
+		rows = append(rows, []string{strings.Join(resources, ","), names, "[" + strings.Join(r.Verbs, " ") + "]"})
+	}
+	for _, r := range answer.Status.NonResourceRules {
+		rows = append(rows, []string{strings.Join(r.NonResourceURLs, ","), "[]", "[" + strings.Join(r.Verbs, " ") + "]"})
+	}
+	text := strings.Join(alignedRows(rows), "\n")
+	if answer.Status.Incomplete {
+		text += "\n\n(not all rules are known: " + answer.Status.EvaluationError + ")"
+	}
+	return text, nil
+}

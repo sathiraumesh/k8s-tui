@@ -218,6 +218,7 @@ plus their own:
 | customresourcedefinitions | `More › crd` | `o` Objects: opens the objects of the kind it adds as a view in More; Delete warns it deletes them all |
 | selfsubjectreviews | `More › whoami` | nothing to list (a question to the API server); `+` Who am I, like `kubectl auth whoami` |
 | selfsubjectaccessreviews | `More › can-i` | `+` Can I: `create deployments apps` (verb, resource, namespace), like `kubectl auth can-i` |
+| selfsubjectrulesreviews | `More › my-rules` | `+` My rules: what you may do in a namespace, like `kubectl auth can-i --list` |
 
 
 The status column of a row is colored by how things are:

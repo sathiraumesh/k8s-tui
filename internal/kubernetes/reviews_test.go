@@ -51,3 +51,20 @@ func TestCanI(t *testing.T) {
 		t.Error("no resource: err = nil")
 	}
 }
+
+func TestMyRules(t *testing.T) {
+	cs := answering("selfsubjectrulesreviews", func(obj runtime.Object) runtime.Object {
+		r := obj.(*authorizationv1.SelfSubjectRulesReview)
+		r.Status.ResourceRules = []authorizationv1.ResourceRule{
+			{Verbs: []string{"get", "list"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+			{Verbs: []string{"*"}, APIGroups: []string{"apps"}, Resources: []string{"deployments"}},
+		}
+		r.Status.NonResourceRules = []authorizationv1.NonResourceRule{{Verbs: []string{"get"}, NonResourceURLs: []string{"/healthz"}}}
+		return r
+	})
+	text, err := NewClientFromClientset(cs).MyRules(context.Background(), "apps")
+	want := "RESOURCES          NAMES   VERBS\npods               []      [get list]\ndeployments.apps   []      [*]\n/healthz           []      [get]"
+	if err != nil || text != want {
+		t.Errorf("text =\n%s\nwant\n%s", text, want)
+	}
+}

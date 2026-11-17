@@ -100,6 +100,7 @@ func Views() []View {
 		customResourceDefinitionsView(),
 		selfSubjectReviewsView(),
 		selfSubjectAccessReviewsView(),
+		selfSubjectRulesReviewsView(),
 	}
 }
 
