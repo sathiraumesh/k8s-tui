@@ -105,12 +105,11 @@ func (c *Client) DescribeDeployment(_ context.Context, namespace, name string, s
 // With running, only the others: an init container has ended by the time a
 // pod runs.
 func (c *Client) DeploymentContainers(ctx context.Context, namespace, name string, running bool) ([]string, error) {
-	d, err := c.clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return templateContainers(d.Spec.Template.Spec, running), nil
+	return workloadContainers(ctx, c.clientset.AppsV1().Deployments(namespace), name, running, deploymentTemplate)
 }
+
+// deploymentTemplate is a deployment's pod template.
+func deploymentTemplate(d *appsv1.Deployment) *corev1.PodTemplateSpec { return &d.Spec.Template }
 
 // DeploymentLabelsAndAnnotations returns the deployment's labels and
 // annotations, as key=value sorted by key.
@@ -152,7 +151,7 @@ func (c *Client) RestartDeployment(ctx context.Context, namespace, name string, 
 		if d.Spec.Paused {
 			return errors.New("the deployment is paused: resume it first")
 		}
-		stampRestart(&d.Spec.Template)
+		stampRestart(deploymentTemplate(d))
 		return nil
 	})
 	return err

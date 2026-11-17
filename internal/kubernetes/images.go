@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -68,17 +67,7 @@ func imagesOf(spec corev1.PodSpec) []string {
 // app=nginx:1.28`. The deployment then rolls out new pods with them. It
 // returns the images before and after.
 func (c *Client) SetDeploymentImage(ctx context.Context, namespace, name string, changes []string, dryRun bool) (Change, error) {
-	images, err := parseImages(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := update(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun, func(d *appsv1.Deployment) error {
-		return setImages(&d.Spec.Template.Spec, images)
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: imagesOf(before.Spec.Template.Spec), After: imagesOf(after.Spec.Template.Spec)}, nil
+	return setWorkloadImage(ctx, c.clientset.AppsV1().Deployments(namespace), name, changes, dryRun, deploymentTemplate)
 }
 
 // SetPodImage changes container images of the pod, like `kubectl set image
