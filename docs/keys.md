@@ -180,6 +180,7 @@ plus their own:
 | jobs | `More › job` | STATUS colored (Complete green, Running/Suspended yellow, Failed red); `o` Logs of its pods; `p` Suspend, `u` Resume; `+ create`: `hello busybox echo hi` |
 | cronjobs | `More › cj` | `n` Run now (a job from it, like `kubectl create job --from=cronjob/NAME`); `p` Suspend, `u` Resume; `+ create`: `backup busybox */5 * * * * echo hi` or `@hourly` |
 | ingresses | `More › ing` | `+ create` from rules `HOST/PATH=SERVICE:PORT` (`shop shop.example.com/*=web:80`; a path ending in `*` is a prefix) |
+| storageclasses | `More › sc` | `m` Make default (the old default stops being it) |
 
 
 The status column of a row is colored by how things are:
