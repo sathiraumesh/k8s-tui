@@ -85,6 +85,7 @@ func Views() []View {
 		volumeAttachmentsView(),
 		flowSchemasView(),
 		priorityLevelConfigurationsView(),
+		validatingWebhookConfigurationsView(),
 	}
 }
 

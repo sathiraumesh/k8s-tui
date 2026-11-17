@@ -208,6 +208,7 @@ plus their own:
 | volumeattachments | `More › volumeattachment` | only the generic actions; Delete detaches |
 | flowschemas | `More › flowschema` | only the generic actions |
 | prioritylevelconfigurations | `More › prioritylevel` | only the generic actions |
+| validatingwebhookconfigurations | `More › validatingwebhook` | only the generic actions |
 
 
 The status column of a row is colored by how things are:
