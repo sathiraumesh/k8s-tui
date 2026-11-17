@@ -240,6 +240,7 @@ plus their own:
 | evictions | `More › eviction` | only the generic actions (alpha) |
 | evictionrequests | `More › evictionrequest` | only the generic actions (alpha) |
 | storageversions | `More › storageversion` | only the generic actions (alpha); written by the API servers |
+| storageversionmigrations | `More › storagemigration` | only the generic actions |
 
 
 The status column of a row is colored by how things are:

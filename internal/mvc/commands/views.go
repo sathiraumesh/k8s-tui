@@ -122,6 +122,7 @@ func Views() []View {
 		evictionsView(),
 		evictionRequestsView(),
 		storageVersionsView(),
+		storageVersionMigrationsView(),
 	}
 }
 
