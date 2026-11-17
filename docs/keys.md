@@ -228,6 +228,7 @@ plus their own:
 | ipaddresses | `More › ip` | only the generic actions |
 | servicecidrs | `More › servicecidr` | only the generic actions |
 | volumeattributesclasses | `More › vac` | only the generic actions |
+| deviceclasses | `More › deviceclass` | only the generic actions |
 
 
 The status column of a row is colored by how things are:

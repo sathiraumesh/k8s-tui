@@ -110,6 +110,7 @@ func Views() []View {
 		ipAddressesView(),
 		serviceCIDRsView(),
 		volumeAttributesClassesView(),
+		deviceClassesView(),
 	}
 }
 
