@@ -153,6 +153,9 @@ func (m Model) overlayTitle() string {
 	switch m.overlay {
 	case overlayActions:
 		if m.tabActions {
+			if m.target == "" {
+				return m.activeTab().ownTitle // not in a namespace, e.g. a volume
+			}
 			return m.activeTab().ownTitle + " in " + m.target // e.g. "Run a pod in default"
 		}
 		return "Actions: " + m.target
@@ -203,7 +206,10 @@ func (m Model) helpText() string {
 		help += " • enter actions"
 	}
 	if m.activeTab().opens != nil {
-		help += " • enter open its tab"
+		help += " • enter open"
+	}
+	if m.inKind() {
+		help += " • esc back to More"
 	}
 	if t := m.activeTab(); len(t.own) > 0 {
 		help += " • " + t.ownButton // e.g. "+ run": its key, then what it does

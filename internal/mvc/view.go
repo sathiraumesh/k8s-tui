@@ -93,15 +93,15 @@ func (m Model) View() string {
 
 	// Tab bar: underline the active tab only when the cursor is on the tabs
 	var tabs []string
-	for i, t := range m.tabs {
+	for i := range m.tabs {
 		if i == m.active {
 			style := ActiveTab
 			if m.focus == focusTabs {
 				style = style.Underline(true)
 			}
-			tabs = append(tabs, style.Render(t.name))
+			tabs = append(tabs, style.Render(m.tabLabel(i)))
 		} else {
-			tabs = append(tabs, InactiveTab.Render(t.name))
+			tabs = append(tabs, InactiveTab.Render(m.tabLabel(i)))
 		}
 	}
 	tabBar := strings.Join(tabs, strings.Repeat(" ", tabGap))

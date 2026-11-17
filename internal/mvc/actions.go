@@ -104,6 +104,9 @@ func (m Model) openRowTab() (Model, tea.Cmd) {
 		m.notice = what + " has no tab of its own yet"
 		return m, nil
 	}
+	if _, isKind := m.kindTab(tab); isKind {
+		return m.openKind(tab) // a view inside More, e.g. the volumes
+	}
 	for i, t := range m.tabs {
 		if t.name == tab {
 			next, cmd := m.switchTab(i - m.active)

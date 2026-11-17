@@ -78,6 +78,9 @@ var resourceTabs = map[string]string{
 	"v1 Pod":             TabPods,
 	"apps/v1 Deployment": TabDeployments,
 	"v1 Service":         TabServices,
+
+	// Kinds without a tab of their own are opened inside More.
+	"v1 PersistentVolume": TabPersistentVolumes,
 }
 
 // ResourceTab is the tab that shows the resource of a More row, e.g.

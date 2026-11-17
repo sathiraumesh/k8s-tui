@@ -71,7 +71,7 @@ func TestMoreKindWithoutTab(t *testing.T) {
 }
 
 func TestMoreHelpSaysEnterOpens(t *testing.T) {
-	if help := moreWithRows(t).helpText(); !strings.Contains(help, "enter open its tab") || strings.Contains(help, "enter actions") {
+	if help := moreWithRows(t).helpText(); !strings.Contains(help, "enter open") || strings.Contains(help, "enter actions") {
 		t.Errorf("help = %q", help)
 	}
 }

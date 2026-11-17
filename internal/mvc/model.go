@@ -134,6 +134,13 @@ type Model struct {
 	// containers are the containers of the pod being picked from, for an
 	// action with containers set (containers.go).
 	containers []string
+
+	// kinds are the views More can open (more.go), and moreKind the one
+	// open, "" for More's own list. moreCursor and moreOffset are where
+	// More's list was, to go back to.
+	kinds                  []tab
+	moreKind               string
+	moreCursor, moreOffset int
 }
 
 // New returns a Model with its starting state: the tabs of allTabs, each
@@ -148,6 +155,7 @@ func New(client *k8s.Client) Model {
 	return Model{
 		client:       client,
 		tabs:         tabs,
+		kinds:        kindTabs(),
 		items:        items,
 		refreshEvery: defaultRefresh,
 		updated:      map[string]time.Time{},

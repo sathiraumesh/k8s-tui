@@ -112,6 +112,8 @@ func (m Model) back() (tea.Model, tea.Cmd) {
 		return m.onOverlayKey(esc)
 	case m.searching:
 		return m.onSearchKey(esc)
+	case m.inKind():
+		return m.closeKind(), nil
 	}
 	return m, nil
 }
@@ -126,6 +128,9 @@ func (m Model) onClick(x, y int) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m = m.closeOverlay()
+		if i == m.active && m.inKind() {
+			return m.closeKind(), nil // a click on More goes back to its list
+		}
 		m.focus = focusTabs
 		if i == m.active {
 			return m, nil
@@ -151,8 +156,8 @@ func (m Model) onClick(x, y int) (tea.Model, tea.Cmd) {
 // tabAt is the index of the tab at column x of the tab bar, or -1.
 func (m Model) tabAt(x int) int {
 	left := 0
-	for i, t := range m.tabs {
-		w := lipgloss.Width(InactiveTab.Render(t.name)) // the active tab is as wide
+	for i := range m.tabs {
+		w := lipgloss.Width(InactiveTab.Render(m.tabLabel(i))) // the active tab is as wide
 		if x >= left && x < left+w {
 			return i
 		}

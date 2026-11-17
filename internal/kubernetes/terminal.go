@@ -139,3 +139,10 @@ func PortForwardArgs(namespace, name, ports, kubeContext string) []string {
 	args := append([]string{"port-forward", "service/" + name, "-n", namespace}, strings.Fields(ports)...)
 	return withContext(args, kubeContext)
 }
+
+// EditPersistentVolume returns the command that opens the volume in an
+// editor, like `kubectl edit persistentvolume NAME`. Most of a bound
+// volume can't change; its capacity, labels and reclaim policy can.
+func (c *Client) EditPersistentVolume(name string) (*exec.Cmd, error) {
+	return kubectl(withContext([]string{"edit", "persistentvolume", name}, c.context))
+}

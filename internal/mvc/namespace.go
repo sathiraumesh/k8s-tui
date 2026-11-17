@@ -60,7 +60,7 @@ func (m Model) tabNamed(name string) (tab, bool) {
 			return t, true
 		}
 	}
-	return tab{}, false
+	return m.kindTab(name) // a view of More
 }
 
 // openNamespaces opens the picker, and loads the namespaces into it.

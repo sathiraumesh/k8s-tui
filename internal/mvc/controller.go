@@ -129,6 +129,9 @@ func (m Model) onKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.searchText() != "" {
 			return m.clearSearch(), nil
 		}
+		if m.inKind() {
+			return m.closeKind(), nil // back to More's list
+		}
 
 	// tab: step the focus tabs → buttons → list → tabs.
 	case KeyTab:

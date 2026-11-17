@@ -33,8 +33,9 @@ type loader func(c *k8s.Client, wide bool, namespace string) tea.Cmd
 
 // tab describes one tab.
 type tab struct {
-	name string
-	load loader
+	name  string
+	title string // how the tab bar shows a view of More (more.go), e.g. "pv"
+	load  loader
 
 	// command is the kubectl command that lists what the tab shows, e.g.
 	// "kubectl get nodes". It is shown on the panel's bottom border, with
@@ -204,7 +205,13 @@ func placeholder(name string, rows ...string) loader {
 }
 
 // activeTab is the tab that is showing.
+// On More, while one of its views is open (more.go), it is that view.
 func (m Model) activeTab() tab {
+	if m.inKind() {
+		if t, ok := m.kindTab(m.moreKind); ok {
+			return t
+		}
+	}
 	return m.tabs[m.active]
 }
 

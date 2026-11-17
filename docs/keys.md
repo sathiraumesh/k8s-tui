@@ -106,8 +106,31 @@ More lists every kind of resource the cluster serves. `enter` (or a
 second click) on one that has a tab of its own goes to that tab:
 `pods` → Pods, `deployments` → Deployments, `services` → Services,
 `nodes` → Nodes, with the cursor on its list. A kind matches by its API
-version and kind, so `pods` of `metrics.k8s.io` doesn't go to Pods. A kind
-without a tab says so on the line under the panel.
+version and kind, so `pods` of `metrics.k8s.io` doesn't go to Pods.
+
+Some kinds without a tab open inside More, which then works like a tab of
+its own (rows, actions, buttons, auto refresh); the tab bar shows
+`More › pv`. `esc`, a right click or a click on More goes back to the
+list of kinds, on the row you came from. Other kinds say they have no
+view yet.
+
+**`persistentvolumes`** (`More › pv`): NAME, CAPACITY, ACCESS-MODES,
+RECLAIM-POLICY, STATUS (Bound and Available green, Released yellow,
+Failed red), CLAIM, STORAGECLASS, REASON, AGE; wide adds VOLUMEMODE.
+
+| Key | Does |
+|---|---|
+| `d` | Describe: its claim, where its storage is, events |
+| `s` | Show labels and annotations |
+| `e` | Edit the YAML |
+| `p` | Reclaim policy: `Retain` keeps it and its data when its claim is deleted, `Delete` deletes it |
+| `a` | Make available: frees a Released volume for a new claim, keeping its data (refused while it is Bound) |
+| `l` | Label (a claim can pick a volume by its labels) |
+| `r` | Delete (while a claim is bound to it, it waits as Terminating) |
+
+`+ create` makes a hostPath volume, a directory on the node, from a name,
+size and path (`data 1Gi /mnt/data`): storage for trying things out on a
+one-node or kind cluster.
 
 ## Status colors
 
