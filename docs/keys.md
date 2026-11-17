@@ -151,7 +151,27 @@ view has the `ns` button.
 `data 1Gi` (the default class), `data 1Gi standard`, or `data 1Gi -` for
 no class, to bind to a hostPath volume made in `More › pv`.
 
-## Status colors
+### Other kinds in More
+
+The kinds below open in More with the columns `kubectl get` prints (the
+API server's own; `w` for its `-o wide` ones), the `ns` button if they are
+in a namespace, and these actions:
+
+| Key | Does |
+|---|---|
+| `d` | Describe (kubectl's describer) |
+| `y` | YAML: the whole object, as `kubectl get -o yaml` prints it |
+| `s` | Show labels and annotations |
+| `e` | Edit the YAML |
+| `l` | Label |
+| `r` | Delete |
+
+plus their own:
+
+| Kind | View | Its own |
+|---|---|---|
+| configmaps | `More › cm` | `a` Data: each key and value; `+ create` from entries: `app-config mode=fast level=3` |
+
 
 The status column of a row is colored by how things are:
 

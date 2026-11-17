@@ -82,7 +82,7 @@ func TestResourceTab(t *testing.T) {
 		}
 	}
 	for _, row := range []string{
-		"configmaps   cm   v1   true   ConfigMap",
+		"widgets   example.com/v1   true   Widget",          // a custom resource
 		"pods   metrics.k8s.io/v1beta1   true   PodMetrics", // not the Pods tab's pods
 	} {
 		if tab, name, ok := ResourceTab(row); ok || name == "" {

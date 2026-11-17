@@ -63,9 +63,9 @@ func TestMoreClickOpensTab(t *testing.T) {
 // A kind without a tab of its own says so, and stays on More.
 func TestMoreKindWithoutTab(t *testing.T) {
 	m := moreWithRows(t)
-	m.items[tabMore] = []string{"configmaps   cm   v1   true   ConfigMap"}
+	m.items[tabMore] = []string{"widgets   example.com/v1   true   Widget"} // a custom resource
 	m.cursor = 0
-	if m = press(t, m, enterKey); m.activeName() != tabMore || m.notice != "configmaps has no tab of its own yet" {
+	if m = press(t, m, enterKey); m.activeName() != tabMore || m.notice != "widgets has no tab of its own yet" {
 		t.Errorf("active = %q, notice = %q", m.activeName(), m.notice)
 	}
 }

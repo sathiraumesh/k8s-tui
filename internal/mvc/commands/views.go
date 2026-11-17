@@ -40,7 +40,9 @@ type View struct {
 
 // Views are the views More opens, one per kind.
 func Views() []View {
-	return nil
+	return []View{
+		configMapsView(),
+	}
 }
 
 // Name is the view's name: its tab, and its rows' key. It is the type as
