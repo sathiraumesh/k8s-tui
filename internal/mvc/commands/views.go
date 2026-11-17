@@ -86,6 +86,7 @@ func Views() []View {
 		flowSchemasView(),
 		priorityLevelConfigurationsView(),
 		validatingWebhookConfigurationsView(),
+		mutatingWebhookConfigurationsView(),
 	}
 }
 
