@@ -232,6 +232,7 @@ plus their own:
 | devicetaintrules | `More › devicetaint` | only the generic actions |
 | resourceclaims | `More › resourceclaim` | only the generic actions |
 | resourceclaimtemplates | `More › resourceclaimtemplate` | only the generic actions |
+| resourceslices | `More › resourceslice` | only the generic actions; written by drivers |
 
 
 The status column of a row is colored by how things are:

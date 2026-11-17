@@ -114,6 +114,7 @@ func Views() []View {
 		deviceTaintRulesView(),
 		resourceClaimsView(),
 		resourceClaimTemplatesView(),
+		resourceSlicesView(),
 	}
 }
 
