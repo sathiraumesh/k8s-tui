@@ -216,6 +216,7 @@ plus their own:
 | mutatingadmissionpolicybindings | `More › mutatingpolicybinding` | only the generic actions |
 | certificatesigningrequests | `More › csr` | CONDITION colored (Approved green, Pending yellow, Denied/Failed red); `a` Approve, `n` Deny, like `kubectl certificate approve` |
 | customresourcedefinitions | `More › crd` | `o` Objects: opens the objects of the kind it adds as a view in More; Delete warns it deletes them all |
+| selfsubjectreviews | `More › whoami` | nothing to list (a question to the API server); `+` Who am I, like `kubectl auth whoami` |
 
 
 The status column of a row is colored by how things are:

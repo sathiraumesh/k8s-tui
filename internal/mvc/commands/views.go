@@ -32,6 +32,11 @@ type View struct {
 	// One with the key of a generic action takes its place.
 	Actions []Action
 
+	// CreateOnly, if set, is a kind the API only lets you create, to ask a
+	// question (a review): it can't be listed, so its view shows this
+	// line instead of rows, and has no actions but its own.
+	CreateOnly string
+
 	// DeleteAbout, if set, says what Delete does to this kind, e.g. that
 	// deleting a namespace deletes everything in it.
 	DeleteAbout string
@@ -93,6 +98,7 @@ func Views() []View {
 		mutatingAdmissionPolicyBindingsView(),
 		certificateSigningRequestsView(),
 		customResourceDefinitionsView(),
+		selfSubjectReviewsView(),
 	}
 }
 
@@ -111,6 +117,9 @@ func (v View) Command() string {
 // row with its namespace first while every namespace is shown.
 func (v View) Load(c *k8s.Client, wide bool, namespace string) tea.Cmd {
 	return func() tea.Msg {
+		if v.CreateOnly != "" {
+			return ItemsLoadedMsg{Tab: v.Name(), Rows: []string{v.CreateOnly}, At: time.Now(), Wide: wide, Namespace: namespace}
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), APITimeout)
 		defer cancel()
 
@@ -163,6 +172,9 @@ func (v View) split(target string) (namespace, name string) {
 // AllActions are the view's actions: its own, then the generic ones whose
 // keys it hasn't taken.
 func (v View) AllActions() []Action {
+	if v.CreateOnly != "" {
+		return nil // nothing is stored: there is no object to act on
+	}
 	taken := map[string]bool{}
 	for _, a := range v.Actions {
 		taken[a.Key] = true
