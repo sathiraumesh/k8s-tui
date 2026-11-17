@@ -192,6 +192,7 @@ plus their own:
 | roles | `More › role` | `+ create`: `reader get,list,watch pods,deployments` (the API group of each resource is found, as kubectl does) |
 | clusterroles | `More › clusterrole` | `+ create`: `node-reader get,list nodes` |
 | rolebindings | `More › rolebinding` | `+ create`: `viewers clusterrole:view user:alice group:devs serviceaccount:apps:ci` |
+| clusterrolebindings | `More › clusterrolebinding` | `+ create`: `admins clusterrole:cluster-admin user:alice` |
 
 
 The status column of a row is colored by how things are:
