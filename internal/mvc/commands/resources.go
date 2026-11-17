@@ -70,6 +70,30 @@ func ResourceOf(row string) (name, apiVersion, kind string, ok bool) {
 	return "", "", "", false
 }
 
+// AnyView is the generic view of the kind of a More row that has no view of
+// its own, e.g. a custom resource: the columns the server prints, and the
+// actions every kind has.
+func AnyView(row string) (View, bool) {
+	name, apiVersion, kind, ok := ResourceOf(row)
+	if !ok {
+		return View{}, false
+	}
+	group, version, grouped := strings.Cut(apiVersion, "/")
+	if !grouped {
+		group, version = "", apiVersion
+	}
+	f := strings.Fields(row)
+	namespaced := false
+	for i := 2; i+1 < len(f); i++ {
+		if f[i] == "true" || f[i] == "false" {
+			namespaced = f[i] == "true"
+			break
+		}
+	}
+	t := k8s.ResourceType{Group: group, Version: version, Resource: name, Kind: kind, Namespaced: namespaced}
+	return View{Type: t, Title: name}, true
+}
+
 // resourceTabs are the tabs that show a kind of resource, by its API
 // version and kind: "v1 Pod" is the Pods tab. Matching both, and not the
 // name, keeps another API's "pods" (metrics.k8s.io) out.

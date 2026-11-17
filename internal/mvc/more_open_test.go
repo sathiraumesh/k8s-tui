@@ -60,12 +60,27 @@ func TestMoreClickOpensTab(t *testing.T) {
 	}
 }
 
-// A kind without a tab of its own says so, and stays on More.
+// A kind without a view of its own, a custom resource, opens in the
+// generic view, in the namespace setting, with the actions every kind has.
 func TestMoreKindWithoutTab(t *testing.T) {
 	m := moreWithRows(t)
 	m.items[tabMore] = []string{"widgets   example.com/v1   true   Widget"} // a custom resource
 	m.cursor = 0
-	if m = press(t, m, enterKey); m.activeName() != tabMore || m.notice != "widgets has no tab of its own yet" {
+	m = press(t, m, enterKey)
+	if !m.inKind() || m.activeName() != "widgets.example.com" || !m.activeTab().namespaced {
+		t.Fatalf("active = %q, inKind = %v", m.activeName(), m.inKind())
+	}
+	if m.kubectlCommand() != "kubectl get widgets.example.com --all-namespaces" || len(m.activeTab().actions) != 6 {
+		t.Errorf("command = %q, %d actions", m.kubectlCommand(), len(m.activeTab().actions))
+	}
+}
+
+// A row whose kind can't be read says so, and stays on More.
+func TestMoreRowNotReadable(t *testing.T) {
+	m := moreWithRows(t)
+	m.items[tabMore] = []string{"oddrow"}
+	m.cursor = 0
+	if m = press(t, m, enterKey); m.activeName() != tabMore || m.notice != "can't read the kind of oddrow" {
 		t.Errorf("active = %q, notice = %q", m.activeName(), m.notice)
 	}
 }

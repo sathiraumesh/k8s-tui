@@ -108,11 +108,12 @@ second click) on one that has a tab of its own goes to that tab:
 `nodes` → Nodes, with the cursor on its list. A kind matches by its API
 version and kind, so `pods` of `metrics.k8s.io` doesn't go to Pods.
 
-Some kinds without a tab open inside More, which then works like a tab of
-its own (rows, actions, buttons, auto refresh); the tab bar shows
-`More › pv`. `esc`, a right click or a click on More goes back to the
-list of kinds, on the row you came from. Other kinds say they have no
-view yet.
+Every other kind opens inside More, which then works like a tab of its
+own (rows, actions, buttons, auto refresh); the tab bar shows
+`More › pv`. `esc`, a right click › Back, or a click on More goes back to
+the list of kinds, on the row you came from. A kind with no view of its
+own (a custom resource, an extension API's) opens in the generic view:
+the columns the server prints, and the actions every kind has.
 
 **`persistentvolumes`** (`More › pv`): NAME, CAPACITY, ACCESS-MODES,
 RECLAIM-POLICY, STATUS (Bound and Available green, Released yellow,

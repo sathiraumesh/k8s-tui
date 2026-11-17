@@ -99,9 +99,13 @@ func (m Model) openRow() (Model, tea.Cmd) {
 // Pods from "pods" on More, with the cursor on its list. A kind without a
 // tab says so on the line under the panel.
 func (m Model) openRowTab() (Model, tea.Cmd) {
-	tab, what, ok := m.activeTab().opens(m.rows()[m.cursor])
+	row := m.rows()[m.cursor]
+	tab, what, ok := m.activeTab().opens(row)
 	if !ok {
-		m.notice = what + " has no tab of its own yet"
+		if v, ok := commands.AnyView(row); ok {
+			return m.onOpenView(commands.OpenViewMsg{View: v}) // e.g. a custom resource
+		}
+		m.notice = "can't read the kind of " + what
 		return m, nil
 	}
 	if _, isKind := m.kindTab(tab); isKind {

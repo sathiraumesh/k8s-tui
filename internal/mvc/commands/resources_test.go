@@ -90,3 +90,13 @@ func TestResourceTab(t *testing.T) {
 		}
 	}
 }
+
+func TestAnyView(t *testing.T) {
+	v, ok := AnyView("certificates   cert,certs   cert-manager.io/v1   true   Certificate")
+	if !ok || v.Name() != "certificates.cert-manager.io" || !v.Type.Namespaced || v.Type.Version != "v1" || v.Title != "certificates" {
+		t.Errorf("view = %+v, %v", v.Type, ok)
+	}
+	if v, _ := AnyView("clusterissuers   cert-manager.io/v1   false   ClusterIssuer"); v.Type.Namespaced {
+		t.Error("a cluster-scoped kind is namespaced")
+	}
+}
