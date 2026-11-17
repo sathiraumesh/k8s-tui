@@ -92,48 +92,10 @@ func DeploymentActions() []Action {
 				return InTerminal("Edit", target, "Edit "+target+": editor closed", false, cmd, err)
 			},
 		},
-		{
-			Key: "c", Name: "Scale", About: "set how many pods it runs; 0 stops them all",
-			Changes:   true,
-			Input:     "replicas",
-			InputArgs: func(n string) string { return "--replicas=" + n },
-			Flags:     []Flag{{Name: FlagDryRun}},
-			Command:   "kubectl scale deployment %s",
-			Run: func(c *k8s.Client, target, input string, flags []Flag) tea.Cmd {
-				namespace, name := SplitTarget(target)
-				return Change("Scale", target, flags, func(ctx context.Context) (string, error) {
-					ch, err := c.ScaleDeployment(ctx, namespace, name, input, Ticked(flags, FlagDryRun))
-					return ChangeText("Replicas", ch.Before, ch.After), err
-				})
-			},
-		},
-		{
-			Key: "i", Name: "Set image", About: "change a container's image; the deployment rolls out new pods with it",
-			Changes:    true,
-			Input:      "images (CONTAINER=IMAGE)",
-			Containers: (*k8s.Client).DeploymentContainers,
-			Flags:      []Flag{{Name: FlagDryRun}},
-			Command:    "kubectl set image deployment/%s",
-			Run: func(c *k8s.Client, target, input string, flags []Flag) tea.Cmd {
-				namespace, name := SplitTarget(target)
-				return Change("Set image", target, flags, func(ctx context.Context) (string, error) {
-					ch, err := c.SetDeploymentImage(ctx, namespace, name, strings.Fields(input), Ticked(flags, FlagDryRun))
-					return ChangeText("Images", ch.Before, ch.After), err
-				})
-			},
-		},
-		{
-			Key: "t", Name: "Restart", About: "replace its pods with new ones, a few at a time, like kubectl rollout restart",
-			Changes: true,
-			Flags:   []Flag{{Name: FlagDryRun}},
-			Command: "kubectl rollout restart deployment %s",
-			Run: func(c *k8s.Client, target, _ string, flags []Flag) tea.Cmd {
-				namespace, name := SplitTarget(target)
-				return Change("Restart", target, flags, func(ctx context.Context) (string, error) {
-					return "", c.RestartDeployment(ctx, namespace, name, Ticked(flags, FlagDryRun))
-				})
-			},
-		},
+		scaleAction("deployment", "0 stops them all", (*k8s.Client).ScaleDeployment),
+		setImageAction("deployment", "the deployment rolls out new pods with it",
+			(*k8s.Client).DeploymentContainers, (*k8s.Client).SetDeploymentImage),
+		restartAction("deployment", "replace its pods with new ones, a few at a time", (*k8s.Client).RestartDeployment),
 		exposeAction(),
 		{
 			Key: "l", Name: "Label", About: "set labels (key=value) or remove them (key-) on the deployment, not its pods",
