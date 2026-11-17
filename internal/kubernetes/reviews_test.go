@@ -2,9 +2,11 @@ package kubernetes
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -29,5 +31,23 @@ func TestWhoAmI(t *testing.T) {
 	text, err := NewClientFromClientset(cs).WhoAmIText(context.Background())
 	if err != nil || text != "Username: kubernetes-admin\nGroups:\n  kubeadm:cluster-admins\n  system:masters" {
 		t.Errorf("text = %q, err = %v", text, err)
+	}
+}
+
+func TestCanI(t *testing.T) {
+	var asked *authorizationv1.ResourceAttributes
+	cs := answering("selfsubjectaccessreviews", func(obj runtime.Object) runtime.Object {
+		r := obj.(*authorizationv1.SelfSubjectAccessReview)
+		asked = r.Spec.ResourceAttributes
+		r.Status = authorizationv1.SubjectAccessReviewStatus{Allowed: true, Reason: "RBAC: allowed by ClusterRoleBinding"}
+		return r
+	})
+	cs.Resources = rbacCluster().Resources
+	text, err := NewClientFromClientset(cs).CanI(context.Background(), "create", "deployments", "apps")
+	if err != nil || !strings.HasPrefix(text, "yes") || asked.Group != "apps" || asked.Resource != "deployments" || asked.Namespace != "apps" {
+		t.Errorf("text = %q, asked = %+v, err = %v", text, asked, err)
+	}
+	if _, err := NewClientFromClientset(cs).CanI(context.Background(), "create", "", ""); err == nil {
+		t.Error("no resource: err = nil")
 	}
 }

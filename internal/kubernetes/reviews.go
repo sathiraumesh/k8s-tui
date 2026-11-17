@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,4 +43,55 @@ func userText(user string, groups []string) string {
 func (c *Client) WhoAmIText(ctx context.Context) (string, error) {
 	user, groups, err := c.WhoAmI(ctx)
 	return userText(user, groups), err
+}
+
+// accessAttributes is the question "may VERB RESOURCE in NAMESPACE": the
+// resource as typed (see resourceGroups), the namespace "" for all, or
+// for a resource not in one.
+func (c *Client) accessAttributes(ctx context.Context, verb, resource, namespace string) (*authorizationv1.ResourceAttributes, error) {
+	if verb == "" || resource == "" {
+		return nil, fmt.Errorf("type a verb and a resource, e.g. create deployments")
+	}
+	groupOf, err := c.resourceGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name, group := "*", "*"
+	if resource != "*" {
+		if name, group, err = groupOf(resource); err != nil {
+			return nil, err
+		}
+	}
+	return &authorizationv1.ResourceAttributes{Verb: verb, Group: group, Resource: name, Namespace: namespace}, nil
+}
+
+// answerText is an access review's answer: yes or no, and why if the
+// server says.
+func answerText(status authorizationv1.SubjectAccessReviewStatus) string {
+	answer := "no"
+	if status.Allowed {
+		answer = "yes"
+	}
+	if status.Reason != "" {
+		answer += "\n\n" + status.Reason
+	}
+	if status.EvaluationError != "" {
+		answer += "\n\n(" + status.EvaluationError + ")"
+	}
+	return answer
+}
+
+// CanI asks whether the client may do verb to resource in namespace, like
+// `kubectl auth can-i VERB RESOURCE -n NAMESPACE`: "yes" or "no".
+func (c *Client) CanI(ctx context.Context, verb, resource, namespace string) (string, error) {
+	attrs, err := c.accessAttributes(ctx, verb, resource, namespace)
+	if err != nil {
+		return "", err
+	}
+	review := &authorizationv1.SelfSubjectAccessReview{Spec: authorizationv1.SelfSubjectAccessReviewSpec{ResourceAttributes: attrs}}
+	answer, err := c.clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, review, metav1.CreateOptions{})
+	if err != nil {
+		return "", err
+	}
+	return answerText(answer.Status), nil
 }

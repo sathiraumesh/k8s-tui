@@ -99,6 +99,7 @@ func Views() []View {
 		certificateSigningRequestsView(),
 		customResourceDefinitionsView(),
 		selfSubjectReviewsView(),
+		selfSubjectAccessReviewsView(),
 	}
 }
 
