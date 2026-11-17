@@ -67,6 +67,7 @@ func Views() []View {
 		eventsView(),
 		eventsK8sIOView(),
 		rolesView(),
+		clusterRolesView(),
 	}
 }
 
