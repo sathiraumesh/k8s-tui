@@ -119,6 +119,7 @@ func Views() []View {
 		podGroupsView(),
 		workloadsView(),
 		compositePodGroupsView(),
+		evictionsView(),
 	}
 }
 
