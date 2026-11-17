@@ -25,32 +25,17 @@ func (c *Client) resourceRules(ctx context.Context, verbs, resources []string) (
 	if len(verbs) == 0 || len(resources) == 0 {
 		return nil, fmt.Errorf("type verbs and resources, e.g. get,list,watch pods,deployments")
 	}
-	served, err := c.ListResources(ctx)
+	groupOf, err := c.resourceGroups(ctx)
 	if err != nil {
 		return nil, err
 	}
-	groupOf := map[string]string{}
-	for _, r := range served {
-		group, _, _ := strings.Cut(r.APIVersion, "/")
-		if !strings.Contains(r.APIVersion, "/") {
-			group = "" // core: "v1"
-		}
-		if _, ok := groupOf[r.Name]; !ok {
-			groupOf[r.Name] = group
-		}
-	}
 	byGroup := map[string][]string{}
 	for _, res := range resources {
-		name, group, explicit := strings.Cut(res, ".")
-		switch {
-		case res == "*":
-			name, group = "*", "*"
-		case !explicit:
-			g, ok := groupOf[name]
-			if !ok {
-				return nil, fmt.Errorf("the cluster serves no resource %q", name)
+		name, group := "*", "*"
+		if res != "*" {
+			if name, group, err = groupOf(res); err != nil {
+				return nil, err
 			}
-			group = g
 		}
 		byGroup[group] = append(byGroup[group], name)
 	}
@@ -64,6 +49,36 @@ func (c *Client) resourceRules(ctx context.Context, verbs, resources []string) (
 		rules = append(rules, rbacv1.PolicyRule{APIGroups: []string{g}, Resources: byGroup[g], Verbs: verbs})
 	}
 	return rules, nil
+}
+
+// resourceGroups returns what finds the API group of a resource as typed:
+// "deployments" is in apps, found from what the cluster serves;
+// "deployments.apps" names it; "pods" is in the core group, "".
+func (c *Client) resourceGroups(ctx context.Context) (func(resource string) (name, group string, err error), error) {
+	served, err := c.ListResources(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groupOf := map[string]string{}
+	for _, r := range served {
+		group, _, grouped := strings.Cut(r.APIVersion, "/")
+		if !grouped {
+			group = "" // core: "v1"
+		}
+		if _, ok := groupOf[r.Name]; !ok {
+			groupOf[r.Name] = group
+		}
+	}
+	return func(resource string) (string, string, error) {
+		if name, group, explicit := strings.Cut(resource, "."); explicit {
+			return name, group, nil
+		}
+		group, ok := groupOf[resource]
+		if !ok {
+			return "", "", fmt.Errorf("the cluster serves no resource %q", resource)
+		}
+		return resource, group, nil
+	}, nil
 }
 
 // CreateRole makes a role allowing verbs on resources (see resourceRules),
