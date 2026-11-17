@@ -146,3 +146,10 @@ func PortForwardArgs(namespace, name, ports, kubeContext string) []string {
 func (c *Client) EditPersistentVolume(name string) (*exec.Cmd, error) {
 	return kubectl(withContext([]string{"edit", "persistentvolume", name}, c.context))
 }
+
+// EditPersistentVolumeClaim returns the command that opens the claim in an
+// editor, like `kubectl edit persistentvolumeclaim NAME -n NAMESPACE`.
+// Little of a bound claim can change: its size (to grow) and labels.
+func (c *Client) EditPersistentVolumeClaim(namespace, name string) (*exec.Cmd, error) {
+	return kubectl(withContext([]string{"edit", "persistentvolumeclaim", name, "-n", namespace}, c.context))
+}

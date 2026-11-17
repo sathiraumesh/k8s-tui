@@ -132,6 +132,25 @@ Failed red), CLAIM, STORAGECLASS, REASON, AGE; wide adds VOLUMEMODE.
 size and path (`data 1Gi /mnt/data`): storage for trying things out on a
 one-node or kind cluster.
 
+**`persistentvolumeclaims`** (`More › pvc`): NAMESPACE, NAME, STATUS
+(Bound green, Pending yellow, Lost red), VOLUME, CAPACITY, ACCESS-MODES,
+STORAGECLASS, AGE; wide adds VOLUMEMODE. Claims are in a namespace, so the
+view has the `ns` button.
+
+| Key | Does |
+|---|---|
+| `d` | Describe: its volume, the pods using it, events |
+| `s` | Show labels and annotations |
+| `u` | Used by: the pods that mount it (while one does, it can't be deleted for good) |
+| `c` | Resize: type a bigger size, e.g. `2Gi` (only if its storage class allows expansion) |
+| `e` | Edit the YAML |
+| `l` | Label |
+| `r` | Delete (its volume then goes by its reclaim policy) |
+
+`+ create` makes a claim from a name, a size and maybe a storage class:
+`data 1Gi` (the default class), `data 1Gi standard`, or `data 1Gi -` for
+no class, to bind to a hostPath volume made in `More › pv`.
+
 ## Status colors
 
 The status column of a row is colored by how things are:

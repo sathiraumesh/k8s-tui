@@ -109,7 +109,7 @@ func (m Model) pickNamespace(i int) (Model, tea.Cmd) {
 	if i > 0 {
 		m.namespace = choices[i]
 	}
-	for _, t := range m.tabs {
+	for _, t := range append(append([]tab{}, m.tabs...), m.kinds...) {
 		if t.namespaced {
 			m.items[t.name] = []string{"loading..."}
 			delete(m.updated, t.name)

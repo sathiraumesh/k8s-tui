@@ -10,7 +10,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubectl/pkg/describe"
@@ -188,9 +187,9 @@ func (c *Client) CreateHostPathVolume(ctx context.Context, name, size, dir strin
 	if errs := validation.IsDNS1123Subdomain(name); len(errs) > 0 {
 		return fmt.Errorf("volume name %q: %s", name, strings.Join(errs, "; "))
 	}
-	capacity, err := resource.ParseQuantity(size)
-	if err != nil || capacity.Sign() <= 0 {
-		return fmt.Errorf("size %q: type an amount of storage, e.g. 1Gi or 500Mi", size)
+	capacity, err := parseSize(size)
+	if err != nil {
+		return err
 	}
 	if !path.IsAbs(dir) {
 		return fmt.Errorf("path %q: type a directory from /, e.g. /mnt/data", dir)

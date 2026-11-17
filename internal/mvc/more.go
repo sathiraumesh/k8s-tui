@@ -33,6 +33,22 @@ func kindTabs() []tab {
 			ownTitle:    "Create a persistent volume",
 			autoRefresh: true,
 		},
+		{
+			name:          commands.TabPersistentVolumeClaims,
+			title:         "pvc",
+			load:          commands.LoadPersistentVolumeClaims,
+			command:       "kubectl get persistentvolumeclaims",
+			namespaced:    true,
+			actions:       commands.PersistentVolumeClaimActions(),
+			status:        &commands.PersistentVolumeClaimStatus,
+			rowTarget:     commands.NamespacedTarget,
+			commandTarget: commands.NamespacedArgs,
+			own:           commands.CreatePersistentVolumeClaimActions(),
+			ownButton:     "+ create",
+			ownTitle:      "Create a claim",
+			ownTarget:     commands.RunNamespace,
+			autoRefresh:   true,
+		},
 	}
 }
 

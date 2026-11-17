@@ -19,6 +19,8 @@ internal/
     images.go               Set image, for pods and deployments
     services.go             Service, ListServices, endpoints, create and expose
     persistentvolumes.go    PersistentVolume, ListPersistentVolumes, reclaim policy, make available
+    persistentvolumeclaims.go  PersistentVolumeClaim, its pods, resize, create
+    update.go               what every kind shares: update, labelObject, deleteObject
     terminal.go             the kubectl commands that need the terminal: shells, editors
   mvc/                      the UI: state, key handling and drawing
     tabs.go                 allTabs: every tab, its loader and whether it auto refreshes
@@ -38,6 +40,7 @@ internal/
       deployments.go        LoadDeployments, DeploymentActions, CreateDeploymentActions
       services.go           LoadServices, ServiceActions, CreateServiceActions
       persistentvolumes.go  LoadPersistentVolumes, PersistentVolumeActions (a view of More)
+      persistentvolumeclaims.go  LoadPersistentVolumeClaims, PersistentVolumeClaimActions (a view of More)
       resources.go          LoadResources (More tab)
       status.go             how a status column reads: green, yellow or red
     refresh.go              the auto refresh timer and rates (logic only)
