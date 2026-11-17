@@ -73,6 +73,7 @@ func Views() []View {
 		endpointsView(),
 		endpointSlicesView(),
 		leasesView(),
+		controllerRevisionsView(),
 	}
 }
 
