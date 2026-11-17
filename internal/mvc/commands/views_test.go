@@ -93,3 +93,12 @@ func TestViewsOpenFromMore(t *testing.T) {
 		}
 	}
 }
+
+// A command with no %s for the target is written as it is, with what was
+// typed in it.
+func TestCommandWithoutTarget(t *testing.T) {
+	a := Action{Command: "kubectl create namespace " + InputHere}
+	if got := a.CommandFor("", "shop", nil); got != "kubectl create namespace shop" {
+		t.Errorf("command = %q", got)
+	}
+}

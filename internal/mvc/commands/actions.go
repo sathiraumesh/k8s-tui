@@ -114,7 +114,10 @@ func (a Action) CommandFor(target, input string, flags []Flag) string {
 	if input = strings.TrimSpace(input); input != "" && a.InputArgs != nil {
 		input = a.InputArgs(input)
 	}
-	cmd := fmt.Sprintf(a.Command, target)
+	cmd := a.Command
+	if strings.Contains(cmd, "%s") { // some commands have no target: kubectl create namespace NAME
+		cmd = fmt.Sprintf(cmd, target)
+	}
 	if strings.Contains(cmd, InputHere) {
 		cmd, input = strings.ReplaceAll(cmd, InputHere, input), ""
 	}
