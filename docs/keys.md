@@ -198,6 +198,7 @@ plus their own:
 | leases | `More › lease` | only the generic actions |
 | controllerrevisions | `More › controllerrevision` | only the generic actions (rollout history reads them) |
 | podtemplates | `More › podtemplate` | only the generic actions |
+| replicationcontrollers | `More › rc` | `c` Scale |
 
 
 The status column of a row is colored by how things are:
