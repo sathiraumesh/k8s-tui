@@ -1,25 +1,43 @@
 # Tests every push and pull request, and builds k8s-tui for Linux, macOS
-# and Windows on amd64 (x86-64) and arm64. Publishing a release on GitHub
-# (Releases › Draft a new release › Publish release) builds them from its
-# tag and attaches the compiled binaries to it, ready to download and run,
-# with their checksums (SHA256SUMS).
+# and Windows on amd64 (x86-64) and arm64.
+#
+# It also makes releases itself, with the compiled binaries attached, ready
+# to download and run, and their checksums (SHA256SUMS). Either:
+#
+#   - push a tag:  git tag v0.1.0 && git push origin v0.1.0
+#   - or on GitHub: Actions › CI › Run workflow, and type the version (v0.1.0):
+#     it tags the commit of the branch it runs on.
 
 name: CI
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. v0.1.0 (a new tag)"
+        required: true
 
 permissions:
   contents: read
+
+# The release's version: the one typed, or the tag pushed; "" otherwise.
+env:
+  RELEASE_TAG: ${{ inputs.version || (github.ref_type == 'tag' && github.ref_name) || '' }}
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Check the version
+        if: env.RELEASE_TAG != ''
+        run: |
+          if ! [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$RELEASE_TAG' isn't a version like v1.2.3 (or v1.2.3-rc.1)"; exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
@@ -54,9 +72,8 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
-          # A release's tag (v1.2.3); else what git describes, e.g. v1.2.3-4-gabc1234.
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
+          # The release's version, else what git describes, e.g. v1.2.3-4-gabc1234.
           version="${RELEASE_TAG:-$(git describe --tags --always --dirty)}"
           # The binary itself, ready to run: k8s-tui_v1.2.3_linux_arm64,
           # k8s-tui_v1.2.3_windows_amd64.exe.
@@ -74,11 +91,11 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: github.event_name == 'release'
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to attach the files to the release
+      contents: write # to make the tag and the release
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -86,8 +103,18 @@ jobs:
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS
-      - name: Attach to the release
+      - name: Make the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          # A version with a "-" (v1.2.3-rc.1) is a pre-release.
+          prerelease=""
+          [[ "$RELEASE_TAG" == *-* ]] && prerelease="--prerelease"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Made already (run again): only replace its files.
+            gh release upload "$RELEASE_TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            # The tag pushed, or, from Run workflow, a new one on this commit.
+            gh release create "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes $prerelease
+          fi

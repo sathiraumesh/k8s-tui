@@ -19,3 +19,6 @@ coverage.*
 
 # Personal kubectl reference (not part of the app)
 /kubectl-reference/
+
+# Binaries built locally (see README › Build)
+/dist/

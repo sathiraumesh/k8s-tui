@@ -56,8 +56,6 @@ internal/
     border_view.go          withBorderText: writes text into the top or
                             bottom border (shared by both)
   styles/                   the colour palette
-examples/                   small stand-alone programs for learning Bubble Tea
-                            and Lip Gloss; not part of the app
 docs/                       this documentation
 ```
 
@@ -147,11 +145,10 @@ whether the timer reloads it. Nothing else in
 the app names a particular tab; `loadActive`, the buttons, the update time
 and the refresh timer all read this table.
 
-A tab that isn't loaded from the cluster yet (Pods, Deployments, Services)
-uses `placeholder(name, rows...)`: a loader that sends the same fixed rows
-through the same `ItemsLoadedMsg` as a real loader. So it gets an update
-time, auto refresh and the wide setting like every other tab, and giving
-it real data later is a one-line change in `allTabs`.
+A new tab can start with `placeholder(name, rows...)`: a loader that sends
+the same fixed rows through the same `ItemsLoadedMsg` as a real loader, so
+it gets an update time, auto refresh and the wide setting like every other
+tab before it has real data.
 
 ### Wide columns
 
@@ -240,21 +237,20 @@ rather than the raw colours, so the theme can be changed in one place.
 
 ## How to…
 
-### Load a tab from the cluster
+### Add a kind to More
 
-Using Pods as the example:
+A kind opens in More with the generic calls (list, describe, YAML, show,
+edit, label, delete) without any code: its view is made from its row. To
+give it its own commands:
 
-1. In `internal/kubernetes`, add a `Pod` type and
-   `func (c *Client) ListPods(ctx context.Context) ([]Pod, error)`,
-   following [nodes.go](../internal/kubernetes/nodes.go).
-2. In `internal/mvc/commands`, add `pods.go` with `LoadPods` and `podRows`,
-   following [nodes.go](../internal/mvc/commands/nodes.go). It
-   returns `ItemsLoadedMsg{Tab: TabPods, …}`.
-3. In `allTabs` ([tabs.go](../internal/mvc/tabs.go)), replace
-   `placeholder(tabPods, …)` with `commands.LoadPods`.
-
-`Update` needs no change: it already handles `commands.ItemsLoadedMsg` for any
-tab, and auto refresh, wide and the update time work through `allTabs`.
+1. In `internal/kubernetes`, add `KIND.go` with the cluster calls only it
+   has (e.g. `ScaleStatefulSet`), using `update`, `labelObject` and the
+   like from [update.go](../internal/kubernetes/update.go).
+2. In `internal/mvc/commands`, add `KIND.go` with a `View`: its
+   `ResourceType`, a title, its status column and its own actions,
+   following [configmaps.go](../internal/mvc/commands/configmaps.go).
+3. List it in `Views` ([views.go](../internal/mvc/commands/views.go)), and
+   add its row to the table in [keys.md](keys.md).
 
 ### Add a tab
 
