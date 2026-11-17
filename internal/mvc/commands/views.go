@@ -112,6 +112,7 @@ func Views() []View {
 		volumeAttributesClassesView(),
 		deviceClassesView(),
 		deviceTaintRulesView(),
+		resourceClaimsView(),
 	}
 }
 

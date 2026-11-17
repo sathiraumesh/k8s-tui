@@ -230,6 +230,7 @@ plus their own:
 | volumeattributesclasses | `More › vac` | only the generic actions |
 | deviceclasses | `More › deviceclass` | only the generic actions |
 | devicetaintrules | `More › devicetaint` | only the generic actions |
+| resourceclaims | `More › resourceclaim` | only the generic actions |
 
 
 The status column of a row is colored by how things are:
