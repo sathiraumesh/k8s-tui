@@ -233,6 +233,7 @@ plus their own:
 | resourceclaims | `More › resourceclaim` | only the generic actions |
 | resourceclaimtemplates | `More › resourceclaimtemplate` | only the generic actions |
 | resourceslices | `More › resourceslice` | only the generic actions; written by drivers |
+| resourcepoolstatusrequests | `More › poolstatus` | only the generic actions (alpha) |
 
 
 The status column of a row is colored by how things are:

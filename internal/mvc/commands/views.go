@@ -115,6 +115,7 @@ func Views() []View {
 		resourceClaimsView(),
 		resourceClaimTemplatesView(),
 		resourceSlicesView(),
+		resourcePoolStatusRequestsView(),
 	}
 }
 
