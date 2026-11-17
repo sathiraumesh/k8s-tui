@@ -171,6 +171,7 @@ plus their own:
 | Kind | View | Its own |
 |---|---|---|
 | configmaps | `More › cm` | `a` Data: each key and value; `+ create` from entries: `app-config mode=fast level=3` |
+| secrets | `More › secret` | `a` Decode: each value decoded from base64; `+ create` generic from entries (`db-login user=admin password=s3cret`) or docker-registry (`regcred ghcr.io me PASSWORD`) |
 
 
 The status column of a row is colored by how things are:

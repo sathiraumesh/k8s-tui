@@ -42,6 +42,7 @@ type View struct {
 func Views() []View {
 	return []View{
 		configMapsView(),
+		secretsView(),
 	}
 }
 
