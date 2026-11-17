@@ -64,6 +64,8 @@ func Views() []View {
 		priorityClassesView(),
 		resourceQuotasView(),
 		limitRangesView(),
+		eventsView(),
+		eventsK8sIOView(),
 	}
 }
 
@@ -87,9 +89,15 @@ func (v View) Load(c *k8s.Client, wide bool, namespace string) tea.Cmd {
 
 		table, err := c.ListTable(ctx, v.Type, namespace, wide)
 		withNamespace := v.Type.Namespaced && namespace == AllNamespaces
+		// A row's target is its first cells (NAMESPACE NAME); a kind whose
+		// table doesn't start with the name, as events (LAST SEEN), gets it.
+		withName := len(table.Columns) > 0 && table.Columns[0] != "NAME"
 		cells := make([][]string, 0, len(table.Rows))
 		for _, row := range table.Rows {
 			r := row.Cells
+			if withName {
+				r = append([]string{row.Name}, r...)
+			}
 			if withNamespace {
 				r = append([]string{row.Namespace}, r...)
 			}
