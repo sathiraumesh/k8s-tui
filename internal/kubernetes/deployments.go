@@ -109,16 +109,7 @@ func (c *Client) DeploymentContainers(ctx context.Context, namespace, name strin
 	if err != nil {
 		return nil, err
 	}
-	var containers []string
-	if !running {
-		for _, ct := range d.Spec.Template.Spec.InitContainers {
-			containers = append(containers, ct.Name)
-		}
-	}
-	for _, ct := range d.Spec.Template.Spec.Containers {
-		containers = append(containers, ct.Name)
-	}
-	return containers, nil
+	return templateContainers(d.Spec.Template.Spec, running), nil
 }
 
 // DeploymentLabelsAndAnnotations returns the deployment's labels and
@@ -139,9 +130,9 @@ func (c *Client) LabelDeployment(ctx context.Context, namespace, name string, ch
 // `kubectl scale deployment NAME -n NAMESPACE --replicas=N`. replicas is
 // as typed, a whole number from 0. It returns the replicas before and after.
 func (c *Client) ScaleDeployment(ctx context.Context, namespace, name, replicas string, dryRun bool) (Change, error) {
-	var n int32
-	if _, err := fmt.Sscan(strings.TrimSpace(replicas), &n); err != nil || n < 0 || fmt.Sprint(n) != strings.TrimSpace(replicas) {
-		return Change{}, fmt.Errorf("replicas %q: type a whole number, 0 or more", replicas)
+	n, err := parseReplicas(replicas)
+	if err != nil {
+		return Change{}, err
 	}
 	before, after, err := update(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun, func(d *appsv1.Deployment) error {
 		d.Spec.Replicas = &n
@@ -150,21 +141,8 @@ func (c *Client) ScaleDeployment(ctx context.Context, namespace, name, replicas 
 	if err != nil {
 		return Change{}, err
 	}
-	return Change{Before: []string{replicasText(before)}, After: []string{replicasText(after)}}, nil
+	return Change{Before: replicasText(before.Spec.Replicas), After: replicasText(after.Spec.Replicas)}, nil
 }
-
-// replicasText is the deployment's replicas as "replicas=N".
-func replicasText(d *appsv1.Deployment) string {
-	n := int32(1)
-	if d.Spec.Replicas != nil {
-		n = *d.Spec.Replicas
-	}
-	return fmt.Sprintf("replicas=%d", n)
-}
-
-// restartedAtAnnotation is what `kubectl rollout restart` sets on the pod
-// template: changing the template makes the deployment replace every pod.
-const restartedAtAnnotation = "kubectl.kubernetes.io/restartedAt"
 
 // RestartDeployment replaces the deployment's pods one by one, like
 // `kubectl rollout restart deployment NAME -n NAMESPACE`: it stamps the
@@ -174,10 +152,7 @@ func (c *Client) RestartDeployment(ctx context.Context, namespace, name string, 
 		if d.Spec.Paused {
 			return errors.New("the deployment is paused: resume it first")
 		}
-		if d.Spec.Template.Annotations == nil {
-			d.Spec.Template.Annotations = map[string]string{}
-		}
-		d.Spec.Template.Annotations[restartedAtAnnotation] = time.Now().Format(time.RFC3339)
+		stampRestart(&d.Spec.Template)
 		return nil
 	})
 	return err
