@@ -235,6 +235,7 @@ plus their own:
 | resourceslices | `More › resourceslice` | only the generic actions; written by drivers |
 | resourcepoolstatusrequests | `More › poolstatus` | only the generic actions (alpha) |
 | podgroups | `More › podgroup` | only the generic actions (beta) |
+| workloads | `More › workload` | only the generic actions (beta) |
 
 
 The status column of a row is colored by how things are:

@@ -117,6 +117,7 @@ func Views() []View {
 		resourceSlicesView(),
 		resourcePoolStatusRequestsView(),
 		podGroupsView(),
+		workloadsView(),
 	}
 }
 
