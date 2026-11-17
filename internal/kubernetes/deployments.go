@@ -131,42 +131,12 @@ func (c *Client) DeploymentLabelsAndAnnotations(ctx context.Context, namespace, 
 	return pairs(d.Labels), pairs(d.Annotations), nil
 }
 
-// updateDeployment gets the deployment, lets edit change a copy of it, and
-// saves that (with dryRun, only checks it). It returns both versions.
-func (c *Client) updateDeployment(ctx context.Context, namespace, name string, dryRun bool, edit func(d *appsv1.Deployment) error) (before, after *appsv1.Deployment, err error) {
-	deployments := c.clientset.AppsV1().Deployments(namespace)
-	before, err = deployments.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	edited := before.DeepCopy()
-	if err := edit(edited); err != nil {
-		return nil, nil, err
-	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err = deployments.Update(ctx, edited, opts)
-	return before, after, err
-}
-
 // LabelDeployment sets and removes labels on the deployment, like
 // `kubectl label deployment NAME -n NAMESPACE env=prod old-`, with the same
 // rules as for a node or a pod. Only the deployment's own labels change,
 // not its pods'.
 func (c *Client) LabelDeployment(ctx context.Context, namespace, name string, changes []string, overwrite, dryRun bool) (Change, error) {
-	set, remove, err := parseLabels(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := c.updateDeployment(ctx, namespace, name, dryRun, func(d *appsv1.Deployment) error {
-		return applyLabels(&d.Labels, set, remove, overwrite)
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: pairs(before.Labels), After: pairs(after.Labels)}, nil
+	return labelObject[appsv1.Deployment](ctx, c.clientset.AppsV1().Deployments(namespace), name, changes, overwrite, dryRun)
 }
 
 // ScaleDeployment sets how many pods the deployment runs, like
@@ -177,7 +147,7 @@ func (c *Client) ScaleDeployment(ctx context.Context, namespace, name, replicas 
 	if _, err := fmt.Sscan(strings.TrimSpace(replicas), &n); err != nil || n < 0 || fmt.Sprint(n) != strings.TrimSpace(replicas) {
 		return Change{}, fmt.Errorf("replicas %q: type a whole number, 0 or more", replicas)
 	}
-	before, after, err := c.updateDeployment(ctx, namespace, name, dryRun, func(d *appsv1.Deployment) error {
+	before, after, err := update(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun, func(d *appsv1.Deployment) error {
 		d.Spec.Replicas = &n
 		return nil
 	})
@@ -204,7 +174,7 @@ const restartedAtAnnotation = "kubectl.kubernetes.io/restartedAt"
 // `kubectl rollout restart deployment NAME -n NAMESPACE`: it stamps the
 // time on the pod template, so the deployment rolls out new pods.
 func (c *Client) RestartDeployment(ctx context.Context, namespace, name string, dryRun bool) error {
-	_, _, err := c.updateDeployment(ctx, namespace, name, dryRun, func(d *appsv1.Deployment) error {
+	_, _, err := update(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun, func(d *appsv1.Deployment) error {
 		if d.Spec.Paused {
 			return errors.New("the deployment is paused: resume it first")
 		}

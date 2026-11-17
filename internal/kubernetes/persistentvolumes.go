@@ -115,41 +115,11 @@ func (c *Client) PersistentVolumeLabelsAndAnnotations(ctx context.Context, name 
 	return pairs(pv.Labels), pairs(pv.Annotations), nil
 }
 
-// updatePersistentVolume gets the volume, lets edit change a copy of it,
-// and saves that (with dryRun, only checks it). It returns both versions.
-func (c *Client) updatePersistentVolume(ctx context.Context, name string, dryRun bool, edit func(pv *corev1.PersistentVolume) error) (before, after *corev1.PersistentVolume, err error) {
-	volumes := c.clientset.CoreV1().PersistentVolumes()
-	before, err = volumes.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	edited := before.DeepCopy()
-	if err := edit(edited); err != nil {
-		return nil, nil, err
-	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err = volumes.Update(ctx, edited, opts)
-	return before, after, err
-}
-
 // LabelPersistentVolume sets and removes labels on the volume, like
 // `kubectl label persistentvolume NAME env=prod old-`. A claim can pick
 // a volume by its labels (its selector).
 func (c *Client) LabelPersistentVolume(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (Change, error) {
-	set, remove, err := parseLabels(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := c.updatePersistentVolume(ctx, name, dryRun, func(pv *corev1.PersistentVolume) error {
-		return applyLabels(&pv.Labels, set, remove, overwrite)
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: pairs(before.Labels), After: pairs(after.Labels)}, nil
+	return labelObject[corev1.PersistentVolume](ctx, c.clientset.CoreV1().PersistentVolumes(), name, changes, overwrite, dryRun)
 }
 
 // SetReclaimPolicy sets what happens to the volume when its claim is
@@ -161,7 +131,7 @@ func (c *Client) SetReclaimPolicy(ctx context.Context, name string, policy corev
 	if policy != corev1.PersistentVolumeReclaimRetain && policy != corev1.PersistentVolumeReclaimDelete {
 		return Change{}, fmt.Errorf("reclaim policy %q: it is Retain or Delete", policy)
 	}
-	before, after, err := c.updatePersistentVolume(ctx, name, dryRun, func(pv *corev1.PersistentVolume) error {
+	before, after, err := update(ctx, c.clientset.CoreV1().PersistentVolumes(), name, dryRun, func(pv *corev1.PersistentVolume) error {
 		pv.Spec.PersistentVolumeReclaimPolicy = policy
 		return nil
 	})
@@ -183,7 +153,7 @@ func (c *Client) SetReclaimPolicy(ctx context.Context, name string, policy corev
 // A Bound volume is refused: its claim is still there, and would lose its
 // storage.
 func (c *Client) MakeAvailable(ctx context.Context, name string, dryRun bool) error {
-	_, _, err := c.updatePersistentVolume(ctx, name, dryRun, func(pv *corev1.PersistentVolume) error {
+	_, _, err := update(ctx, c.clientset.CoreV1().PersistentVolumes(), name, dryRun, func(pv *corev1.PersistentVolume) error {
 		switch {
 		case pv.Spec.ClaimRef == nil:
 			return errors.New("it has no claim to forget: it is already free")

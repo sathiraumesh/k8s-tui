@@ -210,28 +210,7 @@ func (c *Client) ServiceLabelsAndAnnotations(ctx context.Context, namespace, nam
 // service NAME -n NAMESPACE env=prod old-`. Its selector, which pods it
 // sends traffic to, doesn't change.
 func (c *Client) LabelService(ctx context.Context, namespace, name string, changes []string, overwrite, dryRun bool) (Change, error) {
-	set, remove, err := parseLabels(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	services := c.clientset.CoreV1().Services(namespace)
-	before, err := services.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return Change{}, err
-	}
-	edited := before.DeepCopy()
-	if err := applyLabels(&edited.Labels, set, remove, overwrite); err != nil {
-		return Change{}, err
-	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err := services.Update(ctx, edited, opts)
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: pairs(before.Labels), After: pairs(after.Labels)}, nil
+	return labelObject[corev1.Service](ctx, c.clientset.CoreV1().Services(namespace), name, changes, overwrite, dryRun)
 }
 
 // DeleteService deletes the service, like `kubectl delete service NAME -n

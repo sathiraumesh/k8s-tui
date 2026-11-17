@@ -8,7 +8,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Setting the image of containers, the same way for a pod and a
@@ -73,7 +72,7 @@ func (c *Client) SetDeploymentImage(ctx context.Context, namespace, name string,
 	if err != nil {
 		return Change{}, err
 	}
-	before, after, err := c.updateDeployment(ctx, namespace, name, dryRun, func(d *appsv1.Deployment) error {
+	before, after, err := update(ctx, c.clientset.AppsV1().Deployments(namespace), name, dryRun, func(d *appsv1.Deployment) error {
 		return setImages(&d.Spec.Template.Spec, images)
 	})
 	if err != nil {
@@ -92,20 +91,9 @@ func (c *Client) SetPodImage(ctx context.Context, namespace, name string, change
 	if err != nil {
 		return Change{}, err
 	}
-	pods := c.clientset.CoreV1().Pods(namespace)
-	before, err := pods.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return Change{}, err
-	}
-	edited := before.DeepCopy()
-	if err := setImages(&edited.Spec, images); err != nil {
-		return Change{}, err
-	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err := pods.Update(ctx, edited, opts)
+	before, after, err := update(ctx, c.clientset.CoreV1().Pods(namespace), name, dryRun, func(p *corev1.Pod) error {
+		return setImages(&p.Spec, images)
+	})
 	if err != nil {
 		return Change{}, err
 	}

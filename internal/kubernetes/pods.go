@@ -375,28 +375,7 @@ func (c *Client) LabelsAndAnnotations(ctx context.Context, namespace, name strin
 // `kubectl label pod NAME -n NAMESPACE env=prod old-`, with the same rules
 // as Label for a node. It returns the pod's labels before and after.
 func (c *Client) LabelPod(ctx context.Context, namespace, name string, changes []string, overwrite, dryRun bool) (Change, error) {
-	set, remove, err := parseLabels(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	pods := c.clientset.CoreV1().Pods(namespace)
-	before, err := pods.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return Change{}, err
-	}
-	edited := before.DeepCopy()
-	if err := applyLabels(&edited.Labels, set, remove, overwrite); err != nil {
-		return Change{}, err
-	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err := pods.Update(ctx, edited, opts)
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: pairs(before.Labels), After: pairs(after.Labels)}, nil
+	return labelObject[corev1.Pod](ctx, c.clientset.CoreV1().Pods(namespace), name, changes, overwrite, dryRun)
 }
 
 // DeletePod deletes the pod, like `kubectl delete pod NAME -n NAMESPACE`.

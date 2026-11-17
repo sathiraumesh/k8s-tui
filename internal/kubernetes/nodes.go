@@ -160,17 +160,7 @@ func (c *Client) DescribeNode(_ context.Context, name string, showEvents bool) (
 // It returns the node's labels before and after, as key=value. After a dry
 // run, after is what the cluster would have saved.
 func (c *Client) Label(ctx context.Context, name string, changes []string, overwrite, dryRun bool) (Change, error) {
-	set, remove, err := parseLabels(changes)
-	if err != nil {
-		return Change{}, err
-	}
-	before, after, err := c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
-		return applyLabels(&n.Labels, set, remove, overwrite)
-	})
-	if err != nil {
-		return Change{}, err
-	}
-	return Change{Before: labelStrings(before), After: labelStrings(after)}, nil
+	return labelObject[corev1.Node](ctx, c.clientset.CoreV1().Nodes(), name, changes, overwrite, dryRun)
 }
 
 // LabelsAndTaints returns the node's labels, as key=value sorted by key, and
@@ -245,7 +235,7 @@ func (c *Client) Taint(ctx context.Context, name string, changes []string, overw
 	if err != nil {
 		return Change{}, err
 	}
-	before, after, err := c.updateNode(ctx, name, dryRun, func(n *corev1.Node) error {
+	before, after, err := update(ctx, c.clientset.CoreV1().Nodes(), name, dryRun, func(n *corev1.Node) error {
 		for _, r := range remove {
 			var kept []corev1.Taint
 			for _, t := range n.Spec.Taints {
@@ -338,32 +328,4 @@ func checkKey(key string) error {
 		return fmt.Errorf("key %q: %s", key, strings.Join(errs, "; "))
 	}
 	return nil
-}
-
-// updateNode reads the node, lets change edit it, and saves it: a GET then
-// a PUT, which is what kubectl label and kubectl taint do. If the node
-// changed in between, the PUT fails with a conflict instead of undoing
-// the other change.
-//
-// It returns the node as it was read, and as the cluster answered the PUT:
-// as saved, or after a dry run as it would have been saved.
-func (c *Client) updateNode(ctx context.Context, name string, dryRun bool, change func(*corev1.Node) error) (before, after *corev1.Node, err error) {
-	nodes := c.clientset.CoreV1().Nodes()
-	before, err = nodes.Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, err
-	}
-	edited := before.DeepCopy() // change edits a copy, so before stays as it was
-	if err := change(edited); err != nil {
-		return nil, nil, err
-	}
-	opts := metav1.UpdateOptions{}
-	if dryRun {
-		opts.DryRun = []string{metav1.DryRunAll}
-	}
-	after, err = nodes.Update(ctx, edited, opts)
-	if err != nil {
-		return nil, nil, err
-	}
-	return before, after, nil
 }
