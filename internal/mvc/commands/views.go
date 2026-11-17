@@ -60,6 +60,7 @@ func Views() []View {
 		ingressClassesView(),
 		networkPoliciesView(),
 		horizontalPodAutoscalersView(),
+		podDisruptionBudgetsView(),
 	}
 }
 
